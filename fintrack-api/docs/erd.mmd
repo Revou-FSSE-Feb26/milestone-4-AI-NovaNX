@@ -1,0 +1,39 @@
+erDiagram
+    users ||--o{ accounts : owns
+    accounts ||--o{ transactions : records
+    categories ||--o{ transactions : classifies
+
+    users {
+        SERIAL id PK
+        VARCHAR name
+        VARCHAR email UK
+        VARCHAR password
+        VARCHAR role
+        TIMESTAMP created_at
+    }
+
+    accounts {
+        SERIAL id PK
+        INTEGER user_id FK
+        VARCHAR name
+        VARCHAR type
+        NUMERIC balance
+        TIMESTAMP created_at
+    }
+
+    categories {
+        SERIAL id PK
+        VARCHAR name UK
+        VARCHAR type
+    }
+
+    transactions {
+        SERIAL id PK
+        INTEGER account_id FK
+        INTEGER category_id FK
+        VARCHAR type
+        NUMERIC amount
+        TEXT description
+        DATE transaction_date
+        TIMESTAMP created_at
+    }
