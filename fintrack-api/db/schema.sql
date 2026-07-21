@@ -27,12 +27,19 @@ CREATE TABLE categories (
 CREATE TABLE transactions (
     id SERIAL PRIMARY KEY,
     account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
+    category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT,
     type VARCHAR(20) NOT NULL CHECK (type IN ('income', 'expense', 'transfer')),
     amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
     description TEXT,
     transaction_date DATE NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_category_required CHECK (
+        (
+            type IN ('income', 'expense')
+            AND category_id IS NOT NULL
+        )
+        OR (type = 'transfer')
+    )
 );
 CREATE INDEX idx_accounts_user_id ON accounts(user_id);
 CREATE INDEX idx_transactions_account_id ON transactions(account_id);

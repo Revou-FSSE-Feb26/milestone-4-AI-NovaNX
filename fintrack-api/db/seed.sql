@@ -24,6 +24,20 @@ VALUES (
         '$2b$10$mockhash.citra',
         'user',
         '2026-05-08 10:30:00'
+    ),
+    (
+        'Danu Prasetyo',
+        'danu@example.com',
+        '$2b$10$mockhash.danu',
+        'user',
+        '2026-05-10 11:00:00'
+    ),
+    (
+        'Eka Rahmawati',
+        'eka@example.com',
+        '$2b$10$mockhash.eka',
+        'user',
+        '2026-05-12 13:45:00'
     );
 INSERT INTO accounts (user_id, name, type, balance, created_at)
 VALUES (
