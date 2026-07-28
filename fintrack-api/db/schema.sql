@@ -27,6 +27,7 @@ CREATE TABLE categories (
 CREATE TABLE transactions (
     id SERIAL PRIMARY KEY,
     account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    to_account_id INTEGER REFERENCES accounts(id) ON DELETE RESTRICT,
     category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT,
     type VARCHAR(20) NOT NULL CHECK (type IN ('income', 'expense', 'transfer')),
     amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
@@ -39,9 +40,23 @@ CREATE TABLE transactions (
             AND category_id IS NOT NULL
         )
         OR (type = 'transfer')
-    )
+    ),
+    CONSTRAINT chk_transfer_to_account CHECK (
+        (
+            type = 'transfer'
+            AND to_account_id IS NOT NULL
+            AND to_account_id <> account_id
+        )
+        OR (
+            type IN ('income', 'expense')
+            AND to_account_id IS NULL
+        )
+    ) -- Note: enforcing that account_id and to_account_id belong to the same
+    -- user_id requires a cross-row lookup and is validated at the application
+    -- layer (TransactionsService.validateTransfer), not by a CHECK constraint.
 );
 CREATE INDEX idx_accounts_user_id ON accounts(user_id);
+CREATE INDEX idx_transactions_to_account_id ON transactions(to_account_id);
 CREATE INDEX idx_transactions_account_id ON transactions(account_id);
 CREATE INDEX idx_transactions_category_id ON transactions(category_id);
 CREATE INDEX idx_transactions_date ON transactions(transaction_date);

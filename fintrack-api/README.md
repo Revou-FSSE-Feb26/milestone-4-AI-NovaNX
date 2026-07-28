@@ -116,9 +116,23 @@ Server berjalan di `http://localhost:3000` secara default. Nilai port dapat diub
 }
 ```
 
+**POST /transactions (transfer antar akun sendiri)**
+
+```json
+{
+  "account_id": 1,
+  "to_account_id": 2,
+  "type": "transfer",
+  "amount": 500000,
+  "description": "Top up dompet harian",
+  "transaction_date": "2026-06-15"
+}
+```
+
 > `type` transactions: `income` | `expense` | `transfer`
 > `type` categories: `income` | `expense`
-> Untuk `type: "transfer"`, `category_id` tidak wajib diisi.
+> Untuk `type: "transfer"`, `category_id` tidak wajib diisi, tetapi `to_account_id` **wajib** diisi.
+> Transfer hanya diperbolehkan **antar akun milik user yang sama**; `to_account_id` harus berbeda dari `account_id` dan harus dimiliki oleh `user_id` yang sama dengan akun asal. Transfer ke akun milik user lain (atau tanpa `to_account_id`) ditolak dengan **400 Bad Request**.
 
 ## Validasi
 
@@ -128,16 +142,50 @@ Global `ValidationPipe` aktif dengan:
 - `forbidNonWhitelisted: true` — field asing mengembalikan **400 Bad Request**
 - `transform: true` — tipe data otomatis dikonversi (string → number untuk `:id`)
 
-## Menjalankan SQL
+## Database & Prisma
 
-Buat database lokal, lalu jalankan file secara berurutan dari folder `fintrack-api`:
+Skema database dikelola lewat **Prisma** (`prisma/schema.prisma`), strukturnya identik dengan `db/schema.sql` (tabel & kolom snake_case yang sama). Semua service (`users`, `accounts`, `categories`, `transactions`) mengakses PostgreSQL lewat `PrismaService`.
+
+Setup dari folder `fintrack-api`:
 
 ```bash
-createdb fintrack
-psql -d fintrack -f db/schema.sql
-psql -d fintrack -f db/seed.sql
-psql -d fintrack -f db/queries.sql
+cp .env.example .env          # sesuaikan DATABASE_URL dengan kredensial Postgres lokal
+createdb fintrack             # atau: createdb -U <role> fintrack
+npx prisma migrate dev --name init   # membuat tabel sesuai prisma/schema.prisma + auto-seed
 ```
+
+Jika PostgreSQL meminta password role tertentu, sesuaikan `DATABASE_URL` di `.env`:
+
+```
+DATABASE_URL=postgresql://<user>:<password>@localhost:5432/fintrack
+```
+
+Data contoh (`prisma/seed.ts`, 5 users, 6 accounts, 7 categories, 24 transactions — identik dengan `db/seed.sql`) otomatis dijalankan setiap kali `prisma migrate dev` atau `prisma migrate reset` selesai, lewat konfigurasi `"prisma": { "seed": "..." }` di `package.json`. Untuk menjalankannya ulang secara manual (misalnya setelah data berubah saat testing):
+
+```bash
+npx prisma db seed
+# atau
+npm run prisma:seed
+```
+
+Perintah lain yang tersedia:
+
+```bash
+npm run prisma:generate   # regenerate Prisma Client setelah schema.prisma berubah
+npm run prisma:migrate    # buat/terapkan migrasi baru (otomatis re-seed)
+npm run prisma:studio     # buka Prisma Studio (GUI) untuk melihat/edit data
+npm run prisma:seed       # jalankan ulang prisma/seed.ts secara manual
+```
+
+> `db/schema.sql`, `db/seed.sql`, dan `db/queries.sql` tetap disimpan sebagai referensi/dokumentasi skema mentah, tetapi migrasi dan seeding yang sesungguhnya sekarang dijalankan lewat Prisma (`prisma/migrations/`, `prisma/seed.ts`).
+
+### Query relasional (nested include)
+
+Beberapa endpoint mengembalikan data relasi bersarang dalam satu response (Prisma `include`), bukan sekadar `findMany`/`findUnique` datar:
+
+- `GET /users` → setiap user disertai `accounts` miliknya (password selalu disembunyikan lewat `omit`)
+- `GET /accounts/:id` → akun disertai seluruh `transactions` miliknya
+- `GET /transactions` dan `GET /transactions/:id` → transaksi disertai `account`, `toAccount` (tujuan transfer, jika ada), dan `category`
 
 ## Pengujian
 
@@ -148,44 +196,12 @@ npm run test
 npm run test:e2e
 ```
 
-Database belum dihubungkan ke NestJS pada milestone ini. Endpoint berikut mengembalikan static mock data dari service masing-masing:
+Tes e2e memeriksa bahwa endpoint dapat diakses dan mengembalikan field sesuai canonical schema FinTrack.
 
-| Method | Endpoint        | Deskripsi                    |
-| ------ | --------------- | ---------------------------- |
-| GET    | `/users`        | Menampilkan daftar pengguna  |
-| GET    | `/accounts`     | Menampilkan daftar akun      |
-| GET    | `/categories`   | Menampilkan daftar kategori  |
-| GET    | `/transactions` | Menampilkan daftar transaksi |
+## Postman Collection
 
-## Menjalankan SQL
+Collection Postman tersedia di [`docs/fintrack.postman_collection.json`](docs/fintrack.postman_collection.json). Import ke Postman, atur variable `baseUrl` (default `http://localhost:3000`), lalu jalankan. Collection ini mencakup:
 
-Buat database lokal, lalu jalankan file secara berurutan dari folder `fintrack-api`:
-
-```bash
-createdb fintrack
-psql -d fintrack -f db/schema.sql
-psql -d fintrack -f db/seed.sql
-psql -d fintrack -f db/queries.sql
-```
-
-Jika PostgreSQL menggunakan role tertentu, tambahkan opsi `-U`:
-
-```bash
-createdb -U postgres fintrack
-psql -U postgres -d fintrack -f db/schema.sql
-psql -U postgres -d fintrack -f db/seed.sql
-psql -U postgres -d fintrack -f db/queries.sql
-```
-
-PostgreSQL akan meminta password role tersebut bila password authentication aktif. `schema.sql` dapat dijalankan ulang karena tabel lama dihapus berdasarkan urutan foreign key; setelah itu jalankan kembali `seed.sql`.
-
-## Pengujian
-
-```bash
-npm run build
-npm run lint
-npm run test
-npm run test:e2e
-```
-
-Tes e2e memeriksa bahwa keempat mock endpoint dapat diakses dan mengembalikan field sesuai canonical schema FinTrack.
+- Request CRUD untuk `users`, `accounts`, `categories`, dan `transactions`
+- Contoh transfer antar akun sendiri (happy path) dan transfer lintas user (ditolak 400)
+- Minimal satu contoh **validation error (400)** per resource, lengkap dengan saved response example

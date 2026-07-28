@@ -1,141 +1,223 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { AccountsService } from '../accounts/accounts.service';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { Transaction, Category } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateTransactionDto,
   TransactionType,
 } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 
-export interface Transaction {
-  id: number;
-  account_id: number;
-  category_id: number | null;
-  type: TransactionType;
-  amount: number;
-  description: string | null;
-  transaction_date: string;
-  created_at: string;
-}
+// Reused by findAll/findOne to return nested related data (account, transfer
+// destination account, category) in a single response.
+const relationsInclude = {
+  account: { select: { id: true, name: true, type: true } },
+  toAccount: { select: { id: true, name: true, type: true } },
+  category: true,
+} as const;
+
+type AccountSummary = { id: number; name: string; type: string };
+type TransactionWithRelations = Transaction & {
+  account?: AccountSummary;
+  toAccount?: AccountSummary | null;
+  category?: Category | null;
+};
 
 @Injectable()
 export class TransactionsService {
-  constructor(private readonly accountsService: AccountsService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  private transactions: Transaction[] = [
-    {
-      id: 1,
-      account_id: 1,
-      category_id: 1,
-      type: TransactionType.INCOME,
-      amount: 9000000,
-      description: 'June salary',
-      transaction_date: '2026-06-01',
-      created_at: '2026-06-01T08:00:00.000Z',
-    },
-    {
-      id: 2,
-      account_id: 1,
-      category_id: 5,
-      type: TransactionType.EXPENSE,
-      amount: 650000,
-      description: 'Electricity and internet',
-      transaction_date: '2026-06-03',
-      created_at: '2026-06-03T19:20:00.000Z',
-    },
-    {
-      id: 3,
-      account_id: 1,
-      category_id: 3,
-      type: TransactionType.EXPENSE,
-      amount: 185000,
-      description: 'Family dinner',
-      transaction_date: '2026-06-08',
-      created_at: '2026-06-08T20:15:00.000Z',
-    },
-    {
-      id: 4,
-      account_id: 2,
-      category_id: 3,
-      type: TransactionType.EXPENSE,
-      amount: 45000,
-      description: 'Office lunch',
-      transaction_date: '2026-06-10',
-      created_at: '2026-06-10T12:25:00.000Z',
-    },
-    {
-      id: 5,
-      account_id: 2,
-      category_id: 4,
-      type: TransactionType.EXPENSE,
-      amount: 30000,
-      description: 'Bus and MRT',
-      transaction_date: '2026-06-14',
-      created_at: '2026-06-14T18:10:00.000Z',
-    },
-  ];
-
-  private nextId = 6;
-
-  private balanceDelta(type: TransactionType, amount: number): number {
-    if (type === TransactionType.INCOME) return amount;
-    if (type === TransactionType.EXPENSE) return -amount;
-    return 0; // transfer: no net change on single account
+  // Prisma returns `amount` as a Decimal instance; convert it back to a
+  // plain number so the API response shape matches the previous contract.
+  private serialize(tx: TransactionWithRelations) {
+    return { ...tx, amount: Number(tx.amount) };
   }
 
-  findAll() {
-    return this.transactions;
+  // Transfers must stay within a single user's own accounts: no external
+  // transfer (destination missing) and no cross-user transfer.
+  private async validateTransfer(
+    accountId: number,
+    toAccountId: number | undefined,
+  ): Promise<number> {
+    if (!toAccountId) {
+      throw new BadRequestException(
+        'to_account_id is required for transfer transactions',
+      );
+    }
+    if (toAccountId === accountId) {
+      throw new BadRequestException(
+        'to_account_id must be different from account_id',
+      );
+    }
+
+    const [source, destination] = await Promise.all([
+      this.prisma.account.findUnique({ where: { id: accountId } }),
+      this.prisma.account.findUnique({ where: { id: toAccountId } }),
+    ]);
+    if (!source) throw new NotFoundException(`Account #${accountId} not found`);
+    if (!destination)
+      throw new NotFoundException(`Account #${toAccountId} not found`);
+    if (source.user_id !== destination.user_id) {
+      throw new BadRequestException(
+        'Transfers are only allowed between accounts owned by the same user',
+      );
+    }
+
+    return toAccountId;
   }
 
-  findOne(id: number) {
-    const tx = this.transactions.find((t) => t.id === id);
+  private balanceUpdates(
+    type: string,
+    amount: number,
+    accountId: number,
+    toAccountId: number | null,
+  ): { accountId: number; delta: number }[] {
+    if (type === 'income') return [{ accountId, delta: amount }];
+    if (type === 'expense') return [{ accountId, delta: -amount }];
+    if (type === 'transfer' && toAccountId) {
+      return [
+        { accountId, delta: -amount },
+        { accountId: toAccountId, delta: amount },
+      ];
+    }
+    return [];
+  }
+
+  // Nested relational query: each transaction is returned together with its
+  // account, transfer-destination account, and category in one response.
+  async findAll() {
+    const transactions = await this.prisma.transaction.findMany({
+      orderBy: { id: 'asc' },
+      include: relationsInclude,
+    });
+    return transactions.map((tx) => this.serialize(tx));
+  }
+
+  async findOne(id: number) {
+    const tx = await this.prisma.transaction.findUnique({
+      where: { id },
+      include: relationsInclude,
+    });
     if (!tx) throw new NotFoundException(`Transaction #${id} not found`);
-    return tx;
+    return this.serialize(tx);
   }
 
-  create(dto: CreateTransactionDto) {
-    const transaction: Transaction = {
-      id: this.nextId++,
-      account_id: dto.account_id,
-      category_id: dto.category_id ?? null,
-      type: dto.type,
-      amount: dto.amount,
-      description: dto.description ?? null,
-      transaction_date: dto.transaction_date,
-      created_at: new Date().toISOString(),
-    };
-    this.transactions.push(transaction);
-    this.accountsService.adjustBalance(
-      dto.account_id,
-      this.balanceDelta(dto.type, dto.amount),
-    );
-    return transaction;
+  async create(dto: CreateTransactionDto) {
+    let toAccountId: number | null = null;
+    if (dto.type === TransactionType.TRANSFER) {
+      toAccountId = await this.validateTransfer(
+        dto.account_id,
+        dto.to_account_id,
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const transaction = await tx.transaction.create({
+        data: {
+          account_id: dto.account_id,
+          to_account_id: toAccountId,
+          category_id: dto.category_id ?? null,
+          type: dto.type,
+          amount: dto.amount,
+          description: dto.description ?? null,
+          transaction_date: new Date(dto.transaction_date),
+        },
+      });
+
+      const updates = this.balanceUpdates(
+        dto.type,
+        dto.amount,
+        dto.account_id,
+        toAccountId,
+      );
+      for (const update of updates) {
+        await tx.account.update({
+          where: { id: update.accountId },
+          data: { balance: { increment: update.delta } },
+        });
+      }
+
+      return this.serialize(transaction);
+    });
   }
 
-  update(id: number, dto: UpdateTransactionDto) {
-    const tx = this.findOne(id);
-    // Reverse old effect
-    this.accountsService.adjustBalance(
-      tx.account_id,
-      -this.balanceDelta(tx.type, tx.amount),
-    );
-    Object.assign(tx, dto);
-    // Apply new effect
-    this.accountsService.adjustBalance(
-      tx.account_id,
-      this.balanceDelta(tx.type, tx.amount),
-    );
-    return tx;
+  async update(id: number, dto: UpdateTransactionDto) {
+    const existing = await this.findOne(id);
+
+    const newType = dto.type ?? existing.type;
+    const newAccountId = dto.account_id ?? existing.account_id;
+
+    let newToAccountId: number | null = null;
+    if (newType === 'transfer') {
+      newToAccountId = await this.validateTransfer(
+        newAccountId,
+        dto.to_account_id ?? existing.to_account_id ?? undefined,
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Reverse old effect
+      const oldUpdates = this.balanceUpdates(
+        existing.type,
+        existing.amount,
+        existing.account_id,
+        existing.to_account_id,
+      );
+      for (const update of oldUpdates) {
+        await tx.account.update({
+          where: { id: update.accountId },
+          data: { balance: { increment: -update.delta } },
+        });
+      }
+
+      const updated = await tx.transaction.update({
+        where: { id },
+        data: {
+          ...dto,
+          to_account_id: newToAccountId,
+          transaction_date: dto.transaction_date
+            ? new Date(dto.transaction_date)
+            : undefined,
+        },
+      });
+
+      // Apply new effect
+      const newUpdates = this.balanceUpdates(
+        updated.type,
+        Number(updated.amount),
+        updated.account_id,
+        updated.to_account_id,
+      );
+      for (const update of newUpdates) {
+        await tx.account.update({
+          where: { id: update.accountId },
+          data: { balance: { increment: update.delta } },
+        });
+      }
+
+      return this.serialize(updated);
+    });
   }
 
-  remove(id: number) {
-    const index = this.transactions.findIndex((t) => t.id === id);
-    if (index === -1)
-      throw new NotFoundException(`Transaction #${id} not found`);
-    const [tx] = this.transactions.splice(index, 1);
-    // Reverse effect on account balance
-    this.accountsService.adjustBalance(
-      tx.account_id,
-      -this.balanceDelta(tx.type, tx.amount),
-    );
+  async remove(id: number) {
+    const existing = await this.findOne(id);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.transaction.delete({ where: { id } });
+      const updates = this.balanceUpdates(
+        existing.type,
+        existing.amount,
+        existing.account_id,
+        existing.to_account_id,
+      );
+      for (const update of updates) {
+        await tx.account.update({
+          where: { id: update.accountId },
+          data: { balance: { increment: -update.delta } },
+        });
+      }
+    });
   }
 }

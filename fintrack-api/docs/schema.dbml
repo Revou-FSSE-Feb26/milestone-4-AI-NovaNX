@@ -1,0 +1,43 @@
+// Fintrack API - Database schema (DBML)
+// Paste this file's content into https://dbdiagram.io (Create new diagram)
+// to visualize the ERD, or use File > Import if you prefer the raw SQL in db/schema.sql
+
+Table users {
+  id serial [pk]
+  name varchar(100) [not null]
+  email varchar(255) [not null, unique]
+  password varchar(255) [not null]
+  role varchar(20) [not null, default: 'user']
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table accounts {
+  id serial [pk]
+  user_id integer [not null]
+  name varchar(100) [not null]
+  type varchar(20) [not null, note: 'cash | bank | e-wallet']
+  balance numeric(12,2) [not null, default: 0]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (user_id, name) [unique]
+  }
+}
+
+Table categories {
+  id serial [pk]
+  name varchar(100) [not null, unique]
+  type varchar(20) [not null, note: 'income | expense']
+}
+
+Table transactions {
+  id serial [pk]
+  account_id integer [not null]
+  to_account_id integer [note: 'required when type = transfer; must be a different account owned by the same user']
+  category_id integer
+  type varchar(20) [not null, note: 'income | expense | transfer']
+  amount numeric(12,2) [not null, note: 'amount > 0']
+  description text
+  transaction_date date [not null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}

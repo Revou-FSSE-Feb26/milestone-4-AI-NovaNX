@@ -20,6 +20,11 @@ export class CreateTransactionDto {
   @Min(1)
   account_id: number;
 
+  @ValidateIf((o: CreateTransactionDto) => o.type === TransactionType.TRANSFER)
+  @IsInt()
+  @Min(1)
+  to_account_id?: number;
+
   @ValidateIf((o: CreateTransactionDto) => o.type !== TransactionType.TRANSFER)
   @IsInt()
   @Min(1)

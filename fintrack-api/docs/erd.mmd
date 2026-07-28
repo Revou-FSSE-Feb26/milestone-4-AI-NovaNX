@@ -1,6 +1,7 @@
 erDiagram
     users ||--o{ accounts : owns
     accounts ||--o{ transactions : records
+    accounts ||--o{ transactions : "transfers to (same user only)"
     categories ||--o{ transactions : classifies
 
     users {
@@ -30,6 +31,7 @@ erDiagram
     transactions {
         SERIAL id PK
         INTEGER account_id FK
+        INTEGER to_account_id FK
         INTEGER category_id FK
         VARCHAR type
         NUMERIC amount
