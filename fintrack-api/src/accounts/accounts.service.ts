@@ -1,12 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Account, Transaction } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { isForeignKeyConstraintError } from '../prisma/prisma-error.util';
+import { AccountsRepository } from './accounts.repository';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
 
 @Injectable()
 export class AccountsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly accountsRepository: AccountsRepository) {}
 
   // Prisma returns `balance`/`amount` as Decimal instances; convert them back
   // to plain numbers so the API response shape matches the previous contract.
@@ -24,46 +29,49 @@ export class AccountsService {
   }
 
   async findAll() {
-    const accounts = await this.prisma.account.findMany({
-      orderBy: { id: 'asc' },
-    });
+    const accounts = await this.accountsRepository.findAll();
     return accounts.map((account) => this.serialize(account));
   }
 
   // Nested relational query: returns the account together with its own
   // transactions in a single response.
   async findOne(id: number) {
-    const account = await this.prisma.account.findUnique({
-      where: { id },
-      include: { transactions: { orderBy: { transaction_date: 'desc' } } },
-    });
+    const account = await this.accountsRepository.findById(id);
     if (!account) throw new NotFoundException(`Account #${id} not found`);
     return this.serialize(account);
   }
 
   async create(dto: CreateAccountDto) {
-    const account = await this.prisma.account.create({
-      data: {
-        user_id: dto.user_id,
-        name: dto.name,
-        type: dto.type,
-        balance: dto.balance ?? 0,
-      },
+    const account = await this.accountsRepository.create({
+      user_id: dto.user_id,
+      name: dto.name,
+      type: dto.type,
+      balance: dto.balance ?? 0,
     });
     return this.serialize(account);
   }
 
   async update(id: number, dto: UpdateAccountDto) {
     await this.findOne(id);
-    const account = await this.prisma.account.update({
-      where: { id },
-      data: dto,
-    });
+    const account = await this.accountsRepository.update(id, dto);
     return this.serialize(account);
   }
 
+  // Deleting the account cascades to its own transactions (onDelete: Cascade
+  // on Transaction.account_id), but is blocked if the account is still used
+  // as a transfer destination elsewhere (onDelete: Restrict on
+  // Transaction.to_account_id).
   async remove(id: number) {
     await this.findOne(id);
-    await this.prisma.account.delete({ where: { id } });
+    try {
+      await this.accountsRepository.delete(id);
+    } catch (error) {
+      if (isForeignKeyConstraintError(error)) {
+        throw new ConflictException(
+          `Account #${id} cannot be deleted: it is still referenced as a transfer destination by other transactions`,
+        );
+      }
+      throw error;
+    }
   }
 }

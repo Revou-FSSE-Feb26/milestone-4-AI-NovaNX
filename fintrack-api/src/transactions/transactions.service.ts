@@ -4,20 +4,12 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { Transaction, Category } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { TransactionsRepository } from './transactions.repository';
 import {
   CreateTransactionDto,
   TransactionType,
 } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
-
-// Reused by findAll/findOne to return nested related data (account, transfer
-// destination account, category) in a single response.
-const relationsInclude = {
-  account: { select: { id: true, name: true, type: true } },
-  toAccount: { select: { id: true, name: true, type: true } },
-  category: true,
-} as const;
 
 type AccountSummary = { id: number; name: string; type: string };
 type TransactionWithRelations = Transaction & {
@@ -28,7 +20,9 @@ type TransactionWithRelations = Transaction & {
 
 @Injectable()
 export class TransactionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly transactionsRepository: TransactionsRepository,
+  ) {}
 
   // Prisma returns `amount` as a Decimal instance; convert it back to a
   // plain number so the API response shape matches the previous contract.
@@ -54,8 +48,8 @@ export class TransactionsService {
     }
 
     const [source, destination] = await Promise.all([
-      this.prisma.account.findUnique({ where: { id: accountId } }),
-      this.prisma.account.findUnique({ where: { id: toAccountId } }),
+      this.transactionsRepository.findAccountById(accountId),
+      this.transactionsRepository.findAccountById(toAccountId),
     ]);
     if (!source) throw new NotFoundException(`Account #${accountId} not found`);
     if (!destination)
@@ -89,18 +83,12 @@ export class TransactionsService {
   // Nested relational query: each transaction is returned together with its
   // account, transfer-destination account, and category in one response.
   async findAll() {
-    const transactions = await this.prisma.transaction.findMany({
-      orderBy: { id: 'asc' },
-      include: relationsInclude,
-    });
+    const transactions = await this.transactionsRepository.findAll();
     return transactions.map((tx) => this.serialize(tx));
   }
 
   async findOne(id: number) {
-    const tx = await this.prisma.transaction.findUnique({
-      where: { id },
-      include: relationsInclude,
-    });
+    const tx = await this.transactionsRepository.findById(id);
     if (!tx) throw new NotFoundException(`Transaction #${id} not found`);
     return this.serialize(tx);
   }
@@ -114,9 +102,10 @@ export class TransactionsService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const transaction = await tx.transaction.create({
-        data: {
+    return this.transactionsRepository.runInTransaction(async (tx) => {
+      const transaction = await this.transactionsRepository.createTransaction(
+        tx,
+        {
           account_id: dto.account_id,
           to_account_id: toAccountId,
           category_id: dto.category_id ?? null,
@@ -125,7 +114,7 @@ export class TransactionsService {
           description: dto.description ?? null,
           transaction_date: new Date(dto.transaction_date),
         },
-      });
+      );
 
       const updates = this.balanceUpdates(
         dto.type,
@@ -134,10 +123,11 @@ export class TransactionsService {
         toAccountId,
       );
       for (const update of updates) {
-        await tx.account.update({
-          where: { id: update.accountId },
-          data: { balance: { increment: update.delta } },
-        });
+        await this.transactionsRepository.adjustAccountBalance(
+          tx,
+          update.accountId,
+          update.delta,
+        );
       }
 
       return this.serialize(transaction);
@@ -158,7 +148,7 @@ export class TransactionsService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.transactionsRepository.runInTransaction(async (tx) => {
       // Reverse old effect
       const oldUpdates = this.balanceUpdates(
         existing.type,
@@ -167,22 +157,24 @@ export class TransactionsService {
         existing.to_account_id,
       );
       for (const update of oldUpdates) {
-        await tx.account.update({
-          where: { id: update.accountId },
-          data: { balance: { increment: -update.delta } },
-        });
+        await this.transactionsRepository.adjustAccountBalance(
+          tx,
+          update.accountId,
+          -update.delta,
+        );
       }
 
-      const updated = await tx.transaction.update({
-        where: { id },
-        data: {
+      const updated = await this.transactionsRepository.updateTransaction(
+        tx,
+        id,
+        {
           ...dto,
           to_account_id: newToAccountId,
           transaction_date: dto.transaction_date
             ? new Date(dto.transaction_date)
             : undefined,
         },
-      });
+      );
 
       // Apply new effect
       const newUpdates = this.balanceUpdates(
@@ -192,10 +184,11 @@ export class TransactionsService {
         updated.to_account_id,
       );
       for (const update of newUpdates) {
-        await tx.account.update({
-          where: { id: update.accountId },
-          data: { balance: { increment: update.delta } },
-        });
+        await this.transactionsRepository.adjustAccountBalance(
+          tx,
+          update.accountId,
+          update.delta,
+        );
       }
 
       return this.serialize(updated);
@@ -204,8 +197,8 @@ export class TransactionsService {
 
   async remove(id: number) {
     const existing = await this.findOne(id);
-    await this.prisma.$transaction(async (tx) => {
-      await tx.transaction.delete({ where: { id } });
+    await this.transactionsRepository.runInTransaction(async (tx) => {
+      await this.transactionsRepository.deleteTransaction(tx, id);
       const updates = this.balanceUpdates(
         existing.type,
         existing.amount,
@@ -213,10 +206,11 @@ export class TransactionsService {
         existing.to_account_id,
       );
       for (const update of updates) {
-        await tx.account.update({
-          where: { id: update.accountId },
-          data: { balance: { increment: -update.delta } },
-        });
+        await this.transactionsRepository.adjustAccountBalance(
+          tx,
+          update.accountId,
+          -update.delta,
+        );
       }
     });
   }
