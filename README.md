@@ -6,8 +6,9 @@ Source code project ada di folder [`fintrack-api/`](fintrack-api).
 
 ## Live Base URL
 
-> **TODO: isi setelah deployment**
-> `https://<your-app>.railway.app` _(ganti dengan URL aktual setelah deploy)_
+[https://milestone-4-ai-novanx-production.up.railway.app](https://milestone-4-ai-novanx-production.up.railway.app)
+
+Dokumentasi Swagger tersedia di [https://milestone-4-ai-novanx-production.up.railway.app/docs](https://milestone-4-ai-novanx-production.up.railway.app/docs).
 
 ## What's New (Week 21)
 
@@ -222,7 +223,7 @@ Tes e2e memeriksa bahwa endpoint dapat diakses dan mengembalikan field sesuai ca
 
 ## Postman Collection
 
-Collection Postman tersedia di [`fintrack-api/docs/fintrack.postman_collection.json`](fintrack-api/docs/fintrack.postman_collection.json). Import ke Postman, atur variable `baseUrl` (default `http://localhost:3000`), lalu jalankan. Collection ini mencakup:
+Collection Postman tersedia di [fintrack-api/docs/fintrack.postman_collection.json](https://github.com/Revou-FSSE-Feb26/milestone-4-AI-NovaNX/blob/main/fintrack-api/docs/fintrack.postman_collection.json) (klik untuk melihat isi file di GitHub, lalu download dan import ke Postman lewat `File → Import`). Atur variable `baseUrl` (default `http://localhost:3000`), lalu jalankan. Collection ini mencakup:
 
 - Request CRUD untuk `users`, `accounts`, `categories`, dan `transactions`
 - Contoh transfer antar akun sendiri (happy path) dan transfer lintas user (ditolak 400)
