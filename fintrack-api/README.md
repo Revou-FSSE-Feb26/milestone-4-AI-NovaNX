@@ -7,6 +7,12 @@ FinTrack API adalah backend untuk aplikasi pencatatan keuangan pribadi. Setiap p
 > **TODO: isi setelah deployment**
 > `https://<your-app>.railway.app` _(ganti dengan URL aktual setelah deploy)_
 
+## What's New (Week 21)
+
+- Dokumentasi API interaktif dengan **Swagger/OpenAPI** (`@nestjs/swagger`), tersedia di `/docs`
+- Seluruh controller (`accounts`, `categories`, `transactions`, `users`) dilengkapi `@ApiTags`, `@ApiOperation`, `@ApiParam`, dan dekorator response (`@ApiOkResponse`, `@ApiCreatedResponse`, `@ApiNoContentResponse`, `@ApiNotFoundResponse`, `@ApiBadRequestResponse`)
+- Seluruh DTO (`CreateXxxDto`) dilengkapi `@ApiProperty`/`@ApiPropertyOptional` dengan deskripsi dan contoh nilai; `UpdateXxxDto` memakai `PartialType` dari `@nestjs/swagger` agar skema optional-nya terbawa ke dokumentasi
+
 ## What's New (Week 20)
 
 Minggu lalu hanya tersedia 4 mock `GET` endpoint tanpa validasi. Minggu ini:
@@ -43,6 +49,16 @@ npm run start:dev
 ```
 
 Server berjalan di `http://localhost:3000` secara default. Nilai port dapat diubah melalui `PORT` di file `.env`.
+
+## API Documentation (Swagger)
+
+Setelah server berjalan, dokumentasi API interaktif (Swagger UI) tersedia di:
+
+```
+http://localhost:3000/docs
+```
+
+Dokumentasi ini dihasilkan otomatis dari kode (`DocumentBuilder` + `SwaggerModule` di `src/main.ts`) dan mencakup seluruh endpoint `users`, `accounts`, `categories`, dan `transactions`, lengkap dengan skema request/response, contoh nilai, dan status code (`200`, `201`, `204`, `400`, `404`) untuk tiap operasi.
 
 ## API Endpoints
 
