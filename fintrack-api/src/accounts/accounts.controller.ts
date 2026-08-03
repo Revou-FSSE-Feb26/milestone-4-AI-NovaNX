@@ -49,6 +49,7 @@ export class AccountsController {
   @ApiOperation({ summary: 'Create a new account' })
   @ApiCreatedResponse({ description: 'Account created successfully' })
   @ApiBadRequestResponse({ description: 'Validation failed' })
+  @ApiNotFoundResponse({ description: 'User not found' })
   create(@Body() createAccountDto: CreateAccountDto) {
     return this.accountsService.create(createAccountDto);
   }

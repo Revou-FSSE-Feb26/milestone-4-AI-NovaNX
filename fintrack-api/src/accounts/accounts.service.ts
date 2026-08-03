@@ -42,6 +42,9 @@ export class AccountsService {
   }
 
   async create(dto: CreateAccountDto) {
+    const user = await this.accountsRepository.findUserById(dto.user_id);
+    if (!user) throw new NotFoundException(`User #${dto.user_id} not found`);
+
     const account = await this.accountsRepository.create({
       user_id: dto.user_id,
       name: dto.name,
@@ -53,6 +56,10 @@ export class AccountsService {
 
   async update(id: number, dto: UpdateAccountDto) {
     await this.findOne(id);
+    if (dto.user_id) {
+      const user = await this.accountsRepository.findUserById(dto.user_id);
+      if (!user) throw new NotFoundException(`User #${dto.user_id} not found`);
+    }
     const account = await this.accountsRepository.update(id, dto);
     return this.serialize(account);
   }

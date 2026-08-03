@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
@@ -13,6 +13,13 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     await app.init();
   });
 
@@ -24,7 +31,7 @@ describe('AppController (e2e)', () => {
   });
 
   it.each([
-    ['/users', ['id', 'name', 'email', 'password', 'role', 'created_at']],
+    ['/users', ['id', 'name', 'email', 'role', 'created_at', 'accounts']],
     ['/accounts', ['id', 'user_id', 'name', 'type', 'balance', 'created_at']],
     ['/categories', ['id', 'name', 'type']],
     [
@@ -40,7 +47,7 @@ describe('AppController (e2e)', () => {
         'created_at',
       ],
     ],
-  ])('GET %s returns schema-shaped mock data', async (path, fields) => {
+  ])('GET %s returns schema-shaped database data', async (path, fields) => {
     const response = await request(app.getHttpServer()).get(path).expect(200);
     const body = response.body as unknown;
 
@@ -55,6 +62,41 @@ describe('AppController (e2e)', () => {
         Object.fromEntries(fields.map((field) => [field, expect.anything()])),
       ),
     );
+
+    if (path === '/users') {
+      expect(body[0]).not.toHaveProperty('password');
+    }
+  });
+
+  it('POST /accounts rejects an unknown user', () => {
+    return request(app.getHttpServer())
+      .post('/accounts')
+      .send({
+        user_id: 999999,
+        name: 'Missing Owner Account',
+        type: 'bank',
+        balance: 0,
+      })
+      .expect(404)
+      .expect(({ body }: { body: { message: string } }) => {
+        expect(body.message).toBe('User #999999 not found');
+      });
+  });
+
+  it('POST /transactions rejects an unknown account', () => {
+    return request(app.getHttpServer())
+      .post('/transactions')
+      .send({
+        account_id: 999999,
+        category_id: 1,
+        type: 'expense',
+        amount: 10000,
+        transaction_date: '2026-08-04',
+      })
+      .expect(404)
+      .expect(({ body }: { body: { message: string } }) => {
+        expect(body.message).toBe('Account #999999 not found');
+      });
   });
 
   afterEach(async () => {

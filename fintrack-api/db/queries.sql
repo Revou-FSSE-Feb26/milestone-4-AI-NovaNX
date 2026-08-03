@@ -1,4 +1,4 @@
--- 1. Shows all expense transactions for account 1, newest first.
+-- 1. Business question: What are account 1's expense transactions, newest first?
 SELECT id,
     amount,
     description,
@@ -8,7 +8,7 @@ WHERE account_id = 1
     AND type = 'expense'
 ORDER BY transaction_date DESC,
     id DESC;
--- 2. Shows transaction details together with their user, account, and category.
+-- 2. Business question: Which user, account, and category belong to each transaction?
 SELECT t.id,
     u.name AS user_name,
     a.name AS account_name,
@@ -22,7 +22,7 @@ FROM transactions AS t
     JOIN categories AS c ON c.id = t.category_id
 ORDER BY t.transaction_date DESC,
     t.id DESC;
--- 3. Calculates total expense per category for each calendar month.
+-- 3. Business question: How much was spent per category in each calendar month?
 SELECT DATE_TRUNC('month', t.transaction_date)::DATE AS month,
     c.name AS category_name,
     SUM(t.amount) AS total_expense
@@ -34,7 +34,7 @@ GROUP BY DATE_TRUNC('month', t.transaction_date),
     c.name
 ORDER BY month,
     total_expense DESC;
--- 4. Surfaces every category, including categories that have zero transactions.
+-- 4. Business question: Which categories have activity, including zero-use categories?
 SELECT c.id,
     c.name,
     c.type,
@@ -46,7 +46,7 @@ GROUP BY c.id,
     c.type
 ORDER BY transaction_count,
     c.name;
--- 5. Finds accounts whose balance is below their owner's average account balance.
+-- 5. Business question: Which accounts are below their owner's average balance?
 SELECT a.id,
     u.name AS user_name,
     a.name AS account_name,
@@ -60,7 +60,7 @@ WHERE a.balance < (
     )
 ORDER BY u.name,
     a.balance;
--- 6. Summarizes total income, expense, and net recorded cash flow per user.
+-- 6. Business question: What are each user's income, expense, and net cash flow?
 SELECT u.id,
     u.name,
     COALESCE(
@@ -92,7 +92,7 @@ FROM users AS u
 GROUP BY u.id,
     u.name
 ORDER BY u.name;
--- 7. Ranks each user's expense categories and returns their highest-spending one.
+-- 7. Business question: What is each user's highest-spending expense category?
 WITH category_spending AS (
     SELECT u.id AS user_id,
         u.name AS user_name,
@@ -122,7 +122,7 @@ SELECT user_name,
 FROM ranked_spending
 WHERE spending_rank = 1
 ORDER BY user_name;
--- 8. Shows each account's latest transaction date and transaction count.
+-- 8. Business question: How active is each account and when was it last used?
 SELECT a.id,
     u.name AS user_name,
     a.name AS account_name,

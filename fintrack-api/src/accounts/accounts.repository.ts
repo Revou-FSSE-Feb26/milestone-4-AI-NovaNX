@@ -6,6 +6,10 @@ import { PrismaService } from '../prisma/prisma.service';
 export class AccountsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  findUserById(id: number) {
+    return this.prisma.user.findUnique({ where: { id } });
+  }
+
   findAll() {
     return this.prisma.account.findMany({ orderBy: { id: 'asc' } });
   }

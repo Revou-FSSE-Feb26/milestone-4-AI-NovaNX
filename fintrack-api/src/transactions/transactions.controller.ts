@@ -49,6 +49,7 @@ export class TransactionsController {
   @ApiOperation({ summary: 'Create a new transaction' })
   @ApiCreatedResponse({ description: 'Transaction created successfully' })
   @ApiBadRequestResponse({ description: 'Validation failed' })
+  @ApiNotFoundResponse({ description: 'Account or category not found' })
   create(@Body() createTransactionDto: CreateTransactionDto) {
     return this.transactionsService.create(createTransactionDto);
   }

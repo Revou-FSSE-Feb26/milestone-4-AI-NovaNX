@@ -80,6 +80,30 @@ export class TransactionsService {
     return [];
   }
 
+  private async validateReferences(
+    accountId: number,
+    categoryId: number | null,
+    type: TransactionType | string,
+  ) {
+    const account =
+      await this.transactionsRepository.findAccountById(accountId);
+    if (!account) {
+      throw new NotFoundException(`Account #${accountId} not found`);
+    }
+
+    if (type !== 'transfer' && !categoryId) {
+      throw new BadRequestException(
+        'category_id is required for income and expense transactions',
+      );
+    }
+
+    if (categoryId) {
+      if (!(await this.transactionsRepository.findCategoryById(categoryId))) {
+        throw new NotFoundException(`Category #${categoryId} not found`);
+      }
+    }
+  }
+
   // Nested relational query: each transaction is returned together with its
   // account, transfer-destination account, and category in one response.
   async findAll() {
@@ -94,6 +118,12 @@ export class TransactionsService {
   }
 
   async create(dto: CreateTransactionDto) {
+    await this.validateReferences(
+      dto.account_id,
+      dto.category_id ?? null,
+      dto.type,
+    );
+
     let toAccountId: number | null = null;
     if (dto.type === TransactionType.TRANSFER) {
       toAccountId = await this.validateTransfer(
@@ -139,6 +169,10 @@ export class TransactionsService {
 
     const newType = dto.type ?? existing.type;
     const newAccountId = dto.account_id ?? existing.account_id;
+    const newCategoryId =
+      newType === 'transfer' ? null : (dto.category_id ?? existing.category_id);
+
+    await this.validateReferences(newAccountId, newCategoryId, newType);
 
     let newToAccountId: number | null = null;
     if (newType === 'transfer') {
@@ -170,6 +204,7 @@ export class TransactionsService {
         {
           ...dto,
           to_account_id: newToAccountId,
+          category_id: newCategoryId,
           transaction_date: dto.transaction_date
             ? new Date(dto.transaction_date)
             : undefined,

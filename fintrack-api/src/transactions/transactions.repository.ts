@@ -32,6 +32,10 @@ export class TransactionsRepository {
     return this.prisma.account.findUnique({ where: { id } });
   }
 
+  findCategoryById(id: number) {
+    return this.prisma.category.findUnique({ where: { id } });
+  }
+
   // Runs a set of writes atomically; used to keep transaction rows and their
   // related account balances consistent.
   runInTransaction<T>(

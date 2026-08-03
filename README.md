@@ -220,6 +220,8 @@ npm run test:e2e
 ```
 
 Tes e2e memeriksa bahwa endpoint dapat diakses dan mengembalikan field sesuai canonical schema FinTrack.
+Hasil dan perintah smoke test deployment production didokumentasikan di
+[`fintrack-api/docs/api-smoke-test.md`](fintrack-api/docs/api-smoke-test.md).
 
 ## Postman Collection
 
