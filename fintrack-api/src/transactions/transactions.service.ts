@@ -81,8 +81,15 @@ export class TransactionsService {
     }
 
     if (categoryId) {
-      if (!(await this.transactionsRepository.findCategoryById(categoryId))) {
+      const category =
+        await this.transactionsRepository.findCategoryById(categoryId);
+      if (!category) {
         throw new NotFoundException(`Category #${categoryId} not found`);
+      }
+      if (type !== 'transfer' && category.type !== type) {
+        throw new BadRequestException(
+          `Category #${categoryId} is ${category.type}, not ${type}`,
+        );
       }
     }
   }

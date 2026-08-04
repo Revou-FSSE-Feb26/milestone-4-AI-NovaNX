@@ -7,7 +7,6 @@ import {
   IsOptional,
   IsString,
   Min,
-  ValidateIf,
 } from 'class-validator';
 
 export enum TransactionType {
@@ -27,7 +26,7 @@ export class CreateTransactionDto {
       'ID of the destination account (required when type is transfer)',
     example: 2,
   })
-  @ValidateIf((o: CreateTransactionDto) => o.type === TransactionType.TRANSFER)
+  @IsOptional()
   @IsInt()
   @Min(1)
   to_account_id?: number;
@@ -36,7 +35,7 @@ export class CreateTransactionDto {
     description: 'ID of the category (required unless type is transfer)',
     example: 3,
   })
-  @ValidateIf((o: CreateTransactionDto) => o.type !== TransactionType.TRANSFER)
+  @IsOptional()
   @IsInt()
   @Min(1)
   category_id?: number;

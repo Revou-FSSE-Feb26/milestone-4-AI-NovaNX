@@ -5,7 +5,10 @@ import {
 } from '@nestjs/common';
 import { Account } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { isForeignKeyConstraintError } from '../prisma/prisma-error.util';
+import {
+  isForeignKeyConstraintError,
+  isUniqueConstraintError,
+} from '../prisma/prisma-error.util';
 import { UsersRepository } from './users.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -43,12 +46,19 @@ export class UsersService {
   async create(dto: CreateUserDto) {
     const exists = await this.usersRepository.findByEmail(dto.email);
     if (exists) throw new ConflictException('Email already registered');
-    return this.usersRepository.create({
-      name: dto.name,
-      email: dto.email,
-      password: await bcrypt.hash(dto.password, 10),
-      role: 'user',
-    });
+    try {
+      return await this.usersRepository.create({
+        name: dto.name,
+        email: dto.email,
+        password: await bcrypt.hash(dto.password, 10),
+        role: 'user',
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ConflictException('Email already registered');
+      }
+      throw error;
+    }
   }
 
   async update(id: number, dto: UpdateUserDto) {
@@ -59,10 +69,17 @@ export class UsersService {
         throw new ConflictException('Email already registered');
       }
     }
-    return this.usersRepository.update(id, {
-      ...dto,
-      ...(dto.password && { password: await bcrypt.hash(dto.password, 10) }),
-    });
+    try {
+      return await this.usersRepository.update(id, {
+        ...dto,
+        ...(dto.password && { password: await bcrypt.hash(dto.password, 10) }),
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ConflictException('Email already registered');
+      }
+      throw error;
+    }
   }
 
   findByEmailForAuth(email: string) {

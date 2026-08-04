@@ -22,6 +22,9 @@ import {
   ApiNotFoundResponse,
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
+  ApiForbiddenResponse,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { AccountsService } from '../accounts/accounts.service';
 import type { AuthUser } from '../auth/auth-user.interface';
@@ -35,6 +38,8 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @ApiTags('users')
 @ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token' })
+@ApiForbiddenResponse({ description: 'Owner or admin access required' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
@@ -76,6 +81,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Create a new user' })
   @ApiCreatedResponse({ description: 'User created successfully' })
   @ApiBadRequestResponse({ description: 'Validation failed' })
+  @ApiConflictResponse({ description: 'Email is already registered' })
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
@@ -86,6 +92,7 @@ export class UsersController {
   @ApiOkResponse({ description: 'User updated successfully' })
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiBadRequestResponse({ description: 'Validation failed' })
+  @ApiConflictResponse({ description: 'Email is already registered' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: AuthUser,
@@ -101,6 +108,9 @@ export class UsersController {
   @ApiParam({ name: 'id', type: Number, description: 'User ID' })
   @ApiNoContentResponse({ description: 'User deleted successfully' })
   @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiConflictResponse({
+    description: 'User is still referenced by a transfer',
+  })
   remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {
     this.assertSelfOrAdmin(id, user);
     return this.usersService.remove(id);

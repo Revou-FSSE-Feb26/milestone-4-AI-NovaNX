@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 // row that is still referenced by another row through an `onDelete: Restrict`
 // relation (see prisma/schema.prisma).
 const FOREIGN_KEY_CONSTRAINT_CODE = 'P2003';
+const UNIQUE_CONSTRAINT_CODE = 'P2002';
 
 export function isForeignKeyConstraintError(
   error: unknown,
@@ -11,5 +12,14 @@ export function isForeignKeyConstraintError(
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === FOREIGN_KEY_CONSTRAINT_CODE
+  );
+}
+
+export function isUniqueConstraintError(
+  error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === UNIQUE_CONSTRAINT_CODE
   );
 }

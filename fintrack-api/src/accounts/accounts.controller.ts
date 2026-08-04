@@ -21,6 +21,8 @@ import {
   ApiNotFoundResponse,
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -31,6 +33,7 @@ import { UpdateAccountDto } from './dto/update-account.dto';
 
 @ApiTags('accounts')
 @ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token' })
 @UseGuards(JwtAuthGuard)
 @Controller('accounts')
 export class AccountsController {
@@ -60,6 +63,7 @@ export class AccountsController {
   @ApiCreatedResponse({ description: 'Account created successfully' })
   @ApiBadRequestResponse({ description: 'Validation failed' })
   @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiConflictResponse({ description: 'Account name already exists' })
   create(
     @CurrentUser() user: AuthUser,
     @Body() createAccountDto: CreateAccountDto,
@@ -73,6 +77,7 @@ export class AccountsController {
   @ApiOkResponse({ description: 'Account updated successfully' })
   @ApiNotFoundResponse({ description: 'Account not found' })
   @ApiBadRequestResponse({ description: 'Validation failed' })
+  @ApiConflictResponse({ description: 'Account name already exists' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: AuthUser,
@@ -87,6 +92,9 @@ export class AccountsController {
   @ApiParam({ name: 'id', type: Number, description: 'Account ID' })
   @ApiNoContentResponse({ description: 'Account deleted successfully' })
   @ApiNotFoundResponse({ description: 'Account not found' })
+  @ApiConflictResponse({
+    description: 'Account is still referenced as a transfer destination',
+  })
   remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {
     return this.accountsService.remove(id, user.id);
   }

@@ -4,7 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Account, Transaction } from '@prisma/client';
-import { isForeignKeyConstraintError } from '../prisma/prisma-error.util';
+import {
+  isForeignKeyConstraintError,
+  isUniqueConstraintError,
+} from '../prisma/prisma-error.util';
 import { AccountsRepository } from './accounts.repository';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
@@ -47,19 +50,37 @@ export class AccountsService {
   }
 
   async create(userId: number, dto: CreateAccountDto) {
-    const account = await this.accountsRepository.create({
-      user_id: userId,
-      name: dto.name,
-      type: dto.type,
-      balance: dto.balance ?? 0,
-    });
-    return this.serialize(account);
+    try {
+      const account = await this.accountsRepository.create({
+        user_id: userId,
+        name: dto.name,
+        type: dto.type,
+        balance: dto.balance ?? 0,
+      });
+      return this.serialize(account);
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ConflictException(
+          `Account named "${dto.name}" already exists for this user`,
+        );
+      }
+      throw error;
+    }
   }
 
   async update(id: number, userId: number, dto: UpdateAccountDto) {
     await this.findOne(id, userId);
-    const account = await this.accountsRepository.update(id, dto);
-    return this.serialize(account);
+    try {
+      const account = await this.accountsRepository.update(id, dto);
+      return this.serialize(account);
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ConflictException(
+          `Account named "${dto.name}" already exists for this user`,
+        );
+      }
+      throw error;
+    }
   }
 
   // Deleting the account cascades to its own transactions (onDelete: Cascade

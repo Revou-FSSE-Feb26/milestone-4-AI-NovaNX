@@ -11,6 +11,10 @@ interface AuthResponse {
   user: { id: number; email: string; role: string };
 }
 
+interface IdResponse {
+  id: number;
+}
+
 describe('FinTrack authentication and authorization (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
@@ -182,6 +186,225 @@ describe('FinTrack authentication and authorization (e2e)', () => {
       .expect(200)
       .expect(({ body }: { body: unknown }) => {
         expect(Array.isArray(body)).toBe(true);
+      });
+  });
+
+  it('enforces profile authorization and permits authenticated category reads', async () => {
+    await request(app.getHttpServer())
+      .get(`/users/${secondUserId}`)
+      .set('Authorization', `Bearer ${firstToken}`)
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .get('/users')
+      .set('Authorization', `Bearer ${firstToken}`)
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .get('/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .get('/categories')
+      .set('Authorization', `Bearer ${firstToken}`)
+      .expect(200);
+  });
+
+  it('maps duplicate account and category names to 409 conflicts', async () => {
+    await request(app.getHttpServer())
+      .post('/accounts')
+      .set('Authorization', `Bearer ${firstToken}`)
+      .send({ name: 'Private Account', type: 'bank' })
+      .expect(409);
+
+    const categoryName = `E2E Category ${suffix}`;
+    const category = await request(app.getHttpServer())
+      .post('/categories')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: categoryName, type: 'expense' })
+      .expect(201);
+    const categoryId = (category.body as IdResponse).id;
+
+    await request(app.getHttpServer())
+      .post('/categories')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: categoryName, type: 'expense' })
+      .expect(409);
+
+    await request(app.getHttpServer())
+      .patch(`/categories/${categoryId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ type: 'income' })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .delete(`/categories/${categoryId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(204);
+  });
+
+  it('validates category types, transfer ownership, and conditional ID types', async () => {
+    const categories = await request(app.getHttpServer())
+      .get('/categories')
+      .set('Authorization', `Bearer ${firstToken}`)
+      .expect(200);
+    const incomeCategoryId = (
+      categories.body as Array<{ id: number; type: string }>
+    ).find((category) => category.type === 'income')?.id;
+
+    await request(app.getHttpServer())
+      .post('/transactions')
+      .set('Authorization', `Bearer ${firstToken}`)
+      .send({
+        account_id: firstAccountId,
+        category_id: incomeCategoryId,
+        type: 'expense',
+        amount: 100,
+        transaction_date: '2026-08-04',
+      })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post('/transactions')
+      .set('Authorization', `Bearer ${firstToken}`)
+      .send({
+        account_id: firstAccountId,
+        to_account_id: firstAccountId + 1,
+        category_id: 'invalid',
+        type: 'transfer',
+        amount: 100,
+        transaction_date: '2026-08-04',
+      })
+      .expect(400);
+
+    const otherUserAccount = await request(app.getHttpServer())
+      .post('/accounts')
+      .set('Authorization', `Bearer ${secondToken}`)
+      .send({ name: `Other User ${suffix}`, type: 'cash' })
+      .expect(201);
+    const otherUserAccountId = (otherUserAccount.body as IdResponse).id;
+
+    await request(app.getHttpServer())
+      .post('/transactions')
+      .set('Authorization', `Bearer ${firstToken}`)
+      .send({
+        account_id: firstAccountId,
+        to_account_id: otherUserAccountId,
+        type: 'transfer',
+        amount: 100,
+        transaction_date: '2026-08-04',
+      })
+      .expect(404);
+  });
+
+  it('applies and reverses income, expense, and transfer balances', async () => {
+    const categories = await request(app.getHttpServer())
+      .get('/categories')
+      .set('Authorization', `Bearer ${firstToken}`)
+      .expect(200);
+    const typedCategories = categories.body as Array<{
+      id: number;
+      type: string;
+    }>;
+    const incomeCategoryId = typedCategories.find(
+      (category) => category.type === 'income',
+    )!.id;
+    const expenseCategoryId = typedCategories.find(
+      (category) => category.type === 'expense',
+    )!.id;
+
+    const destination = await request(app.getHttpServer())
+      .post('/accounts')
+      .set('Authorization', `Bearer ${firstToken}`)
+      .send({ name: `Transfer Target ${suffix}`, type: 'cash' })
+      .expect(201);
+    const destinationId = (destination.body as IdResponse).id;
+
+    const income = await request(app.getHttpServer())
+      .post('/transactions')
+      .set('Authorization', `Bearer ${firstToken}`)
+      .send({
+        account_id: firstAccountId,
+        category_id: incomeCategoryId,
+        type: 'income',
+        amount: 1000,
+        transaction_date: '2026-08-04',
+      })
+      .expect(201);
+    const expense = await request(app.getHttpServer())
+      .post('/transactions')
+      .set('Authorization', `Bearer ${firstToken}`)
+      .send({
+        account_id: firstAccountId,
+        category_id: expenseCategoryId,
+        type: 'expense',
+        amount: 200,
+        transaction_date: '2026-08-04',
+      })
+      .expect(201);
+    const transfer = await request(app.getHttpServer())
+      .post('/transactions')
+      .set('Authorization', `Bearer ${firstToken}`)
+      .send({
+        account_id: firstAccountId,
+        to_account_id: destinationId,
+        type: 'transfer',
+        amount: 500,
+        transaction_date: '2026-08-04',
+      })
+      .expect(201);
+    const incomeId = (income.body as IdResponse).id;
+    const expenseId = (expense.body as IdResponse).id;
+    const transferId = (transfer.body as IdResponse).id;
+
+    await request(app.getHttpServer())
+      .get(`/accounts/${firstAccountId}`)
+      .set('Authorization', `Bearer ${firstToken}`)
+      .expect(200)
+      .expect(({ body }: { body: { balance: number } }) => {
+        expect(body.balance).toBe(50300);
+      });
+    await request(app.getHttpServer())
+      .get(`/accounts/${destinationId}`)
+      .set('Authorization', `Bearer ${firstToken}`)
+      .expect(200)
+      .expect(({ body }: { body: { balance: number } }) => {
+        expect(body.balance).toBe(500);
+      });
+
+    await request(app.getHttpServer())
+      .patch(`/transactions/${expenseId}`)
+      .set('Authorization', `Bearer ${firstToken}`)
+      .send({ amount: 300 })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .delete(`/transactions/${incomeId}`)
+      .set('Authorization', `Bearer ${firstToken}`)
+      .expect(204);
+    await request(app.getHttpServer())
+      .delete(`/transactions/${transferId}`)
+      .set('Authorization', `Bearer ${firstToken}`)
+      .expect(204);
+    await request(app.getHttpServer())
+      .delete(`/transactions/${expenseId}`)
+      .set('Authorization', `Bearer ${firstToken}`)
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .get(`/accounts/${firstAccountId}`)
+      .set('Authorization', `Bearer ${firstToken}`)
+      .expect(200)
+      .expect(({ body }: { body: { balance: number } }) => {
+        expect(body.balance).toBe(50000);
+      });
+    await request(app.getHttpServer())
+      .get(`/accounts/${destinationId}`)
+      .set('Authorization', `Bearer ${firstToken}`)
+      .expect(200)
+      .expect(({ body }: { body: { balance: number } }) => {
+        expect(body.balance).toBe(0);
       });
   });
 

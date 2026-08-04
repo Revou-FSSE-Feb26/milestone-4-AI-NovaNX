@@ -1,8 +1,8 @@
 erDiagram
     users ||--o{ accounts : owns
     accounts ||--o{ transactions : records
-    accounts ||--o{ transactions : "transfers to (same user only)"
-    categories ||--o{ transactions : classifies
+    accounts o|--o{ transactions : "optional transfer destination"
+    categories o|--o{ transactions : "optionally classifies"
 
     users {
         SERIAL id PK

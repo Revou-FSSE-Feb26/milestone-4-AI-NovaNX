@@ -96,15 +96,15 @@ Dokumentasi ini dihasilkan otomatis dari kode (`DocumentBuilder` + `SwaggerModul
 
 ### Users
 
-| Method | Endpoint                    | Akses          | Deskripsi                   |
-| ------ | --------------------------- | -------------- | --------------------------- |
-| POST   | `/auth/register`            | Public         | Registrasi user baru        |
-| POST   | `/auth/login`               | Public         | Mendapatkan JWT             |
-| GET    | `/users/:id`                | Owner / admin  | Detail profil               |
-| PATCH  | `/users/:id`                | Owner / admin  | Update profil               |
-| DELETE | `/users/:id`                | Owner / admin  | Hapus profil                |
-| GET    | `/users`                    | Admin          | Daftar semua user           |
-| GET    | `/users/admin/all-accounts` | Admin          | Daftar seluruh akun         |
+| Method | Endpoint                    | Akses         | Deskripsi            |
+| ------ | --------------------------- | ------------- | -------------------- |
+| POST   | `/auth/register`            | Public        | Registrasi user baru |
+| POST   | `/auth/login`               | Public        | Mendapatkan JWT      |
+| GET    | `/users/:id`                | Owner / admin | Detail profil        |
+| PATCH  | `/users/:id`                | Owner / admin | Update profil        |
+| DELETE | `/users/:id`                | Owner / admin | Hapus profil         |
+| GET    | `/users`                    | Admin         | Daftar semua user    |
+| GET    | `/users/admin/all-accounts` | Admin         | Daftar seluruh akun  |
 
 ### Accounts
 
@@ -179,7 +179,7 @@ Global `ValidationPipe` aktif dengan:
 
 ## Database & Prisma
 
-Skema database dikelola lewat **Prisma** (`fintrack-api/prisma/schema.prisma`), strukturnya identik dengan `fintrack-api/db/schema.sql` (tabel & kolom snake_case yang sama). Semua service (`users`, `accounts`, `categories`, `transactions`) mengakses PostgreSQL lewat `PrismaService`.
+Skema database dikelola lewat **Prisma** (`fintrack-api/prisma/schema.prisma`). Tabel, kolom, index, dan foreign key diselaraskan dengan `fintrack-api/db/schema.sql`. Karena Prisma Schema Language belum mendukung deklarasi `CHECK`, aturan enum, amount positif, category wajib, dan destination transfer diterapkan melalui custom SQL migration `20260804190000_add_business_check_constraints`. Semua service (`users`, `accounts`, `categories`, `transactions`) mengakses PostgreSQL lewat `PrismaService`.
 
 Setup dari folder `fintrack-api`:
 
@@ -234,7 +234,7 @@ npm run test
 npm run test:e2e
 ```
 
-Tes e2e membuat dan membersihkan data test sendiri serta memverifikasi authentication, password hashing, ownership, RBAC, validation, dan throttling.
+Tes e2e membuat dan membersihkan data test sendiri serta memverifikasi authentication, password hashing, ownership, RBAC, validation, conflict handling, throttling, kesesuaian tipe category, transfer ownership, dan perubahan/reversal balance untuk income, expense, serta transfer.
 Hasil dan perintah smoke test deployment production didokumentasikan di
 [`fintrack-api/docs/api-smoke-test.md`](fintrack-api/docs/api-smoke-test.md).
 

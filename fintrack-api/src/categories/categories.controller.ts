@@ -21,6 +21,9 @@ import {
   ApiNotFoundResponse,
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
+  ApiForbiddenResponse,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -31,6 +34,7 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @ApiTags('categories')
 @ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('categories')
 export class CategoriesController {
@@ -57,6 +61,8 @@ export class CategoriesController {
   @ApiOperation({ summary: 'Create a new category' })
   @ApiCreatedResponse({ description: 'Category created successfully' })
   @ApiBadRequestResponse({ description: 'Validation failed' })
+  @ApiConflictResponse({ description: 'Category name already exists' })
+  @ApiForbiddenResponse({ description: 'Admin role required' })
   create(@Body() createCategoryDto: CreateCategoryDto) {
     return this.categoriesService.create(createCategoryDto);
   }
@@ -68,6 +74,8 @@ export class CategoriesController {
   @ApiOkResponse({ description: 'Category updated successfully' })
   @ApiNotFoundResponse({ description: 'Category not found' })
   @ApiBadRequestResponse({ description: 'Validation failed' })
+  @ApiConflictResponse({ description: 'Category name already exists' })
+  @ApiForbiddenResponse({ description: 'Admin role required' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateCategoryDto: UpdateCategoryDto,
@@ -82,6 +90,8 @@ export class CategoriesController {
   @ApiParam({ name: 'id', type: Number, description: 'Category ID' })
   @ApiNoContentResponse({ description: 'Category deleted successfully' })
   @ApiNotFoundResponse({ description: 'Category not found' })
+  @ApiConflictResponse({ description: 'Category is used by transactions' })
+  @ApiForbiddenResponse({ description: 'Admin role required' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.categoriesService.remove(id);
   }

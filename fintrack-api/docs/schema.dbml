@@ -20,6 +20,7 @@ Table accounts {
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
   indexes {
+    user_id
     (user_id, name) [unique]
   }
 }
@@ -40,4 +41,16 @@ Table transactions {
   description text
   transaction_date date [not null]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    account_id
+    to_account_id
+    category_id
+    transaction_date
+  }
 }
+
+Ref accounts_user: accounts.user_id > users.id [delete: cascade]
+Ref transactions_source_account: transactions.account_id > accounts.id [delete: cascade]
+Ref transactions_destination_account: transactions.to_account_id > accounts.id [delete: restrict]
+Ref transactions_category: transactions.category_id > categories.id [delete: restrict]

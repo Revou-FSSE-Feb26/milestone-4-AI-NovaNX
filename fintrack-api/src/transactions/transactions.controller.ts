@@ -21,6 +21,7 @@ import {
   ApiNotFoundResponse,
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -31,6 +32,7 @@ import { UpdateTransactionDto } from './dto/update-transaction.dto';
 
 @ApiTags('transactions')
 @ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token' })
 @UseGuards(JwtAuthGuard)
 @Controller('transactions')
 export class TransactionsController {
