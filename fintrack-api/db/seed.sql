@@ -7,35 +7,35 @@ INSERT INTO users (name, email, password, role, created_at)
 VALUES (
         'Alya Putri',
         'alya@example.com',
-        '$2b$10$mockhash.alya',
-        'user',
+        '$2b$10$Qb9CezzQz.xqYaR90c6IeeYHJ28IKMdwOmqvzr3uUtIPteHhI.GBi',
+        'admin',
         '2026-05-01 08:00:00'
     ),
     (
         'Bima Santoso',
         'bima@example.com',
-        '$2b$10$mockhash.bima',
+        '$2b$10$Qb9CezzQz.xqYaR90c6IeeYHJ28IKMdwOmqvzr3uUtIPteHhI.GBi',
         'user',
         '2026-05-03 09:15:00'
     ),
     (
         'Citra Lestari',
         'citra@example.com',
-        '$2b$10$mockhash.citra',
+        '$2b$10$Qb9CezzQz.xqYaR90c6IeeYHJ28IKMdwOmqvzr3uUtIPteHhI.GBi',
         'user',
         '2026-05-08 10:30:00'
     ),
     (
         'Danu Prasetyo',
         'danu@example.com',
-        '$2b$10$mockhash.danu',
+        '$2b$10$Qb9CezzQz.xqYaR90c6IeeYHJ28IKMdwOmqvzr3uUtIPteHhI.GBi',
         'user',
         '2026-05-10 11:00:00'
     ),
     (
         'Eka Rahmawati',
         'eka@example.com',
-        '$2b$10$mockhash.eka',
+        '$2b$10$Qb9CezzQz.xqYaR90c6IeeYHJ28IKMdwOmqvzr3uUtIPteHhI.GBi',
         'user',
         '2026-05-12 13:45:00'
     );

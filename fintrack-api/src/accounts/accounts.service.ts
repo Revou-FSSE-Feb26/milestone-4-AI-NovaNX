@@ -28,25 +28,27 @@ export class AccountsService {
     };
   }
 
-  async findAll() {
+  async findAll(userId: number) {
+    const accounts = await this.accountsRepository.findAllByUserId(userId);
+    return accounts.map((account) => this.serialize(account));
+  }
+
+  async findAllForAdmin() {
     const accounts = await this.accountsRepository.findAll();
     return accounts.map((account) => this.serialize(account));
   }
 
   // Nested relational query: returns the account together with its own
   // transactions in a single response.
-  async findOne(id: number) {
-    const account = await this.accountsRepository.findById(id);
+  async findOne(id: number, userId: number) {
+    const account = await this.accountsRepository.findByIdAndUserId(id, userId);
     if (!account) throw new NotFoundException(`Account #${id} not found`);
     return this.serialize(account);
   }
 
-  async create(dto: CreateAccountDto) {
-    const user = await this.accountsRepository.findUserById(dto.user_id);
-    if (!user) throw new NotFoundException(`User #${dto.user_id} not found`);
-
+  async create(userId: number, dto: CreateAccountDto) {
     const account = await this.accountsRepository.create({
-      user_id: dto.user_id,
+      user_id: userId,
       name: dto.name,
       type: dto.type,
       balance: dto.balance ?? 0,
@@ -54,12 +56,8 @@ export class AccountsService {
     return this.serialize(account);
   }
 
-  async update(id: number, dto: UpdateAccountDto) {
-    await this.findOne(id);
-    if (dto.user_id) {
-      const user = await this.accountsRepository.findUserById(dto.user_id);
-      if (!user) throw new NotFoundException(`User #${dto.user_id} not found`);
-    }
+  async update(id: number, userId: number, dto: UpdateAccountDto) {
+    await this.findOne(id, userId);
     const account = await this.accountsRepository.update(id, dto);
     return this.serialize(account);
   }
@@ -68,8 +66,8 @@ export class AccountsService {
   // on Transaction.account_id), but is blocked if the account is still used
   // as a transfer destination elsewhere (onDelete: Restrict on
   // Transaction.to_account_id).
-  async remove(id: number) {
-    await this.findOne(id);
+  async remove(id: number, userId: number) {
+    await this.findOne(id, userId);
     try {
       await this.accountsRepository.delete(id);
     } catch (error) {

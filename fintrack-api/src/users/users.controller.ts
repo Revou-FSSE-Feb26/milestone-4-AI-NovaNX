@@ -9,6 +9,8 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,21 +21,41 @@ import {
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiBadRequestResponse,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
+import { AccountsService } from '../accounts/accounts.service';
+import type { AuthUser } from '../auth/auth-user.interface';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 @ApiTags('users')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly accountsService: AccountsService,
+  ) {}
 
   @Get()
+  @Roles('admin')
   @ApiOperation({ summary: 'List all users' })
   @ApiOkResponse({ description: 'List of users returned successfully' })
   findAll() {
     return this.usersService.findAll();
+  }
+
+  @Get('admin/all-accounts')
+  @Roles('admin')
+  @ApiOperation({ summary: 'List every account (admin only)' })
+  findAllAccounts() {
+    return this.accountsService.findAllForAdmin();
   }
 
   @Get(':id')
@@ -41,11 +63,16 @@ export class UsersController {
   @ApiParam({ name: 'id', type: Number, description: 'User ID' })
   @ApiOkResponse({ description: 'User returned successfully' })
   @ApiNotFoundResponse({ description: 'User not found' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    this.assertSelfOrAdmin(id, user);
     return this.usersService.findOne(id);
   }
 
   @Post()
+  @Roles('admin')
   @ApiOperation({ summary: 'Create a new user' })
   @ApiCreatedResponse({ description: 'User created successfully' })
   @ApiBadRequestResponse({ description: 'Validation failed' })
@@ -61,8 +88,10 @@ export class UsersController {
   @ApiBadRequestResponse({ description: 'Validation failed' })
   update(
     @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
     @Body() updateUserDto: UpdateUserDto,
   ) {
+    this.assertSelfOrAdmin(id, user);
     return this.usersService.update(id, updateUserDto);
   }
 
@@ -72,7 +101,14 @@ export class UsersController {
   @ApiParam({ name: 'id', type: Number, description: 'User ID' })
   @ApiNoContentResponse({ description: 'User deleted successfully' })
   @ApiNotFoundResponse({ description: 'User not found' })
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {
+    this.assertSelfOrAdmin(id, user);
     return this.usersService.remove(id);
+  }
+
+  private assertSelfOrAdmin(id: number, user: AuthUser) {
+    if (user.id !== id && user.role !== 'admin') {
+      throw new ForbiddenException('You can only access your own profile');
+    }
   }
 }

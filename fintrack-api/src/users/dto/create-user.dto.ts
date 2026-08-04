@@ -31,10 +31,14 @@ export class CreateUserDto {
 
   @ApiProperty({
     description: 'Account password',
-    example: 'secret123',
-    minLength: 6,
+    example: 'Secure123',
+    minLength: 8,
   })
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, {
+    message:
+      'Password must contain uppercase, lowercase, and numeric characters',
+  })
   password!: string;
 }

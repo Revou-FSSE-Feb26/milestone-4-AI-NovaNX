@@ -10,6 +10,7 @@ import {
   TransactionType,
 } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import { BalanceUpdatesProvider } from './providers/balance-updates.provider';
 
 type AccountSummary = { id: number; name: string; type: string };
 type TransactionWithRelations = Transaction & {
@@ -22,6 +23,7 @@ type TransactionWithRelations = Transaction & {
 export class TransactionsService {
   constructor(
     private readonly transactionsRepository: TransactionsRepository,
+    private readonly balanceUpdatesProvider: BalanceUpdatesProvider,
   ) {}
 
   // Prisma returns `amount` as a Decimal instance; convert it back to a
@@ -35,6 +37,7 @@ export class TransactionsService {
   private async validateTransfer(
     accountId: number,
     toAccountId: number | undefined,
+    userId: number,
   ): Promise<number> {
     if (!toAccountId) {
       throw new BadRequestException(
@@ -48,45 +51,25 @@ export class TransactionsService {
     }
 
     const [source, destination] = await Promise.all([
-      this.transactionsRepository.findAccountById(accountId),
-      this.transactionsRepository.findAccountById(toAccountId),
+      this.transactionsRepository.findAccountByIdAndUserId(accountId, userId),
+      this.transactionsRepository.findAccountByIdAndUserId(toAccountId, userId),
     ]);
     if (!source) throw new NotFoundException(`Account #${accountId} not found`);
     if (!destination)
       throw new NotFoundException(`Account #${toAccountId} not found`);
-    if (source.user_id !== destination.user_id) {
-      throw new BadRequestException(
-        'Transfers are only allowed between accounts owned by the same user',
-      );
-    }
-
     return toAccountId;
-  }
-
-  private balanceUpdates(
-    type: string,
-    amount: number,
-    accountId: number,
-    toAccountId: number | null,
-  ): { accountId: number; delta: number }[] {
-    if (type === 'income') return [{ accountId, delta: amount }];
-    if (type === 'expense') return [{ accountId, delta: -amount }];
-    if (type === 'transfer' && toAccountId) {
-      return [
-        { accountId, delta: -amount },
-        { accountId: toAccountId, delta: amount },
-      ];
-    }
-    return [];
   }
 
   private async validateReferences(
     accountId: number,
     categoryId: number | null,
     type: TransactionType | string,
+    userId: number,
   ) {
-    const account =
-      await this.transactionsRepository.findAccountById(accountId);
+    const account = await this.transactionsRepository.findAccountByIdAndUserId(
+      accountId,
+      userId,
+    );
     if (!account) {
       throw new NotFoundException(`Account #${accountId} not found`);
     }
@@ -106,22 +89,24 @@ export class TransactionsService {
 
   // Nested relational query: each transaction is returned together with its
   // account, transfer-destination account, and category in one response.
-  async findAll() {
-    const transactions = await this.transactionsRepository.findAll();
+  async findAll(userId: number) {
+    const transactions =
+      await this.transactionsRepository.findAllByUserId(userId);
     return transactions.map((tx) => this.serialize(tx));
   }
 
-  async findOne(id: number) {
-    const tx = await this.transactionsRepository.findById(id);
+  async findOne(id: number, userId: number) {
+    const tx = await this.transactionsRepository.findByIdAndUserId(id, userId);
     if (!tx) throw new NotFoundException(`Transaction #${id} not found`);
     return this.serialize(tx);
   }
 
-  async create(dto: CreateTransactionDto) {
+  async create(userId: number, dto: CreateTransactionDto) {
     await this.validateReferences(
       dto.account_id,
       dto.category_id ?? null,
       dto.type,
+      userId,
     );
 
     let toAccountId: number | null = null;
@@ -129,6 +114,7 @@ export class TransactionsService {
       toAccountId = await this.validateTransfer(
         dto.account_id,
         dto.to_account_id,
+        userId,
       );
     }
 
@@ -146,7 +132,7 @@ export class TransactionsService {
         },
       );
 
-      const updates = this.balanceUpdates(
+      const updates = this.balanceUpdatesProvider.calculate(
         dto.type,
         dto.amount,
         dto.account_id,
@@ -164,27 +150,28 @@ export class TransactionsService {
     });
   }
 
-  async update(id: number, dto: UpdateTransactionDto) {
-    const existing = await this.findOne(id);
+  async update(id: number, userId: number, dto: UpdateTransactionDto) {
+    const existing = await this.findOne(id, userId);
 
     const newType = dto.type ?? existing.type;
     const newAccountId = dto.account_id ?? existing.account_id;
     const newCategoryId =
       newType === 'transfer' ? null : (dto.category_id ?? existing.category_id);
 
-    await this.validateReferences(newAccountId, newCategoryId, newType);
+    await this.validateReferences(newAccountId, newCategoryId, newType, userId);
 
     let newToAccountId: number | null = null;
     if (newType === 'transfer') {
       newToAccountId = await this.validateTransfer(
         newAccountId,
         dto.to_account_id ?? existing.to_account_id ?? undefined,
+        userId,
       );
     }
 
     return this.transactionsRepository.runInTransaction(async (tx) => {
       // Reverse old effect
-      const oldUpdates = this.balanceUpdates(
+      const oldUpdates = this.balanceUpdatesProvider.calculate(
         existing.type,
         existing.amount,
         existing.account_id,
@@ -212,7 +199,7 @@ export class TransactionsService {
       );
 
       // Apply new effect
-      const newUpdates = this.balanceUpdates(
+      const newUpdates = this.balanceUpdatesProvider.calculate(
         updated.type,
         Number(updated.amount),
         updated.account_id,
@@ -230,11 +217,11 @@ export class TransactionsService {
     });
   }
 
-  async remove(id: number) {
-    const existing = await this.findOne(id);
+  async remove(id: number, userId: number) {
+    const existing = await this.findOne(id, userId);
     await this.transactionsRepository.runInTransaction(async (tx) => {
       await this.transactionsRepository.deleteTransaction(tx, id);
-      const updates = this.balanceUpdates(
+      const updates = this.balanceUpdatesProvider.calculate(
         existing.type,
         existing.amount,
         existing.account_id,

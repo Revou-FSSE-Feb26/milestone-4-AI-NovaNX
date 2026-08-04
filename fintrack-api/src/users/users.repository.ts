@@ -27,6 +27,13 @@ export class UsersRepository {
     return this.prisma.user.findUnique({ where: { email } });
   }
 
+  findAuthUserById(id: number) {
+    return this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, role: true },
+    });
+  }
+
   create(data: Prisma.UserCreateInput) {
     return this.prisma.user.create({ data, omit: { password: true } });
   }

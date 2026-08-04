@@ -1,603 +1,225 @@
 {
   "info": {
-    "name": "FinTrack API",
-    "description": "Postman collection for the FinTrack API (NestJS + Prisma + PostgreSQL). Covers CRUD for users, accounts, categories and transactions, nested relational responses (Prisma `include`), and at least one validation-error example per resource.",
+    "name": "FinTrack API - Auth & Security",
+    "description": "Part 4 flow: register, login, JWT-protected resources, ownership isolation, RBAC, invalid tokens, and validation.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" }
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "registerEmail", "value": "" },
+    { "key": "accessToken", "value": "" },
+    { "key": "secondToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "accountId", "value": "1" }
   ],
   "item": [
     {
-      "name": "Users",
+      "name": "1. Authentication",
       "item": [
         {
-          "name": "List users (nested accounts, no password)",
+          "name": "Register",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('registerEmail', `postman-${Date.now()}@example.com`);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman User\",\n  \"email\": \"{{registerEmail}}\",\n  \"password\": \"Secure123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "Login and save user token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login succeeds', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('accessToken', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{registerEmail}}\",\n  \"password\": \"Secure123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Login second seeded user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('secondToken', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bima@example.com\",\n  \"password\": \"Fintrack123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Invalid token returns 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Unauthorized', () => pm.response.to.have.status(401));"] }
+            }
+          ],
           "request": {
             "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["users"]
-            },
-            "description": "Returns every user with their `accounts` nested in the same response (Prisma `include`). The password hash is always omitted (Prisma `omit`)."
-          }
-        },
-        {
-          "name": "Create user (happy path)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Fajar Nugroho\",\n  \"email\": \"fajar@example.com\",\n  \"password\": \"secret123\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["users"]
-            }
-          },
-          "response": [
-            {
-              "name": "201 Created",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  { "key": "Content-Type", "value": "application/json" }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"name\": \"Fajar Nugroho\",\n  \"email\": \"fajar@example.com\",\n  \"password\": \"secret123\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/users",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["users"]
-                }
-              },
-              "status": "Created",
-              "code": 201,
-              "_postman_previewlanguage": "json",
-              "header": [
-                { "key": "Content-Type", "value": "application/json" }
-              ],
-              "body": "{\n  \"id\": 6,\n  \"name\": \"Fajar Nugroho\",\n  \"email\": \"fajar@example.com\",\n  \"role\": \"user\",\n  \"created_at\": \"2026-07-29T00:00:00.000Z\"\n}"
-            }
-          ]
-        },
-        {
-          "name": "Create user - validation error",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"\",\n  \"email\": \"not-an-email\",\n  \"password\": \"123\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["users"]
-            },
-            "description": "Empty name, invalid email format, and a password shorter than 6 characters. Expect 400 Bad Request with one message per failed rule."
-          },
-          "response": [
-            {
-              "name": "400 Bad Request",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  { "key": "Content-Type", "value": "application/json" }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"name\": \"\",\n  \"email\": \"not-an-email\",\n  \"password\": \"123\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/users",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["users"]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                { "key": "Content-Type", "value": "application/json" }
-              ],
-              "body": "{\n  \"message\": [\n    \"name should not be empty\",\n    \"email must be an email\",\n    \"password must be longer than or equal to 6 characters\"\n  ],\n  \"error\": \"Bad Request\",\n  \"statusCode\": 400\n}"
-            }
-          ]
-        },
-        {
-          "name": "Create user - duplicate email (409)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Alya Duplicate\",\n  \"email\": \"alya@example.com\",\n  \"password\": \"secret123\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["users"]
-            },
-            "description": "Email already exists in the seed data. Expect 409 Conflict."
-          },
-          "response": [
-            {
-              "name": "409 Conflict",
-              "originalRequest": {
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/users",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["users"]
-                }
-              },
-              "status": "Conflict",
-              "code": 409,
-              "_postman_previewlanguage": "json",
-              "header": [
-                { "key": "Content-Type", "value": "application/json" }
-              ],
-              "body": "{\n  \"message\": \"Email already registered\",\n  \"error\": \"Conflict\",\n  \"statusCode\": 409\n}"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Accounts",
-      "item": [
-        {
-          "name": "List accounts",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/accounts",
-              "host": ["{{baseUrl}}"],
-              "path": ["accounts"]
-            }
-          }
-        },
-        {
-          "name": "Get account by id (nested transactions)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/accounts/1",
-              "host": ["{{baseUrl}}"],
-              "path": ["accounts", "1"]
-            },
-            "description": "Returns the account together with its own `transactions` nested in the same response (Prisma `include`, ordered by transaction_date desc)."
-          }
-        },
-        {
-          "name": "Create account (happy path)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"user_id\": 1,\n  \"name\": \"Jenius Savings\",\n  \"type\": \"bank\",\n  \"balance\": 2500000\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/accounts",
-              "host": ["{{baseUrl}}"],
-              "path": ["accounts"]
-            }
-          },
-          "response": [
-            {
-              "name": "201 Created",
-              "originalRequest": {
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/accounts",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["accounts"]
-                }
-              },
-              "status": "Created",
-              "code": 201,
-              "_postman_previewlanguage": "json",
-              "header": [
-                { "key": "Content-Type", "value": "application/json" }
-              ],
-              "body": "{\n  \"id\": 7,\n  \"user_id\": 1,\n  \"name\": \"Jenius Savings\",\n  \"type\": \"bank\",\n  \"balance\": 2500000,\n  \"created_at\": \"2026-07-29T00:00:00.000Z\"\n}"
-            }
-          ]
-        },
-        {
-          "name": "Create account - validation error",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Missing owner\",\n  \"type\": \"crypto\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/accounts",
-              "host": ["{{baseUrl}}"],
-              "path": ["accounts"]
-            },
-            "description": "Missing required `user_id` and an invalid `type` (not in cash | bank | e-wallet). Expect 400 Bad Request."
-          },
-          "response": [
-            {
-              "name": "400 Bad Request",
-              "originalRequest": {
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/accounts",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["accounts"]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                { "key": "Content-Type", "value": "application/json" }
-              ],
-              "body": "{\n  \"message\": [\n    \"user_id must not be less than 1\",\n    \"user_id must be an integer number\",\n    \"type must be one of the following values: cash, bank, e-wallet\"\n  ],\n  \"error\": \"Bad Request\",\n  \"statusCode\": 400\n}"
-            }
-          ]
-        },
-        {
-          "name": "Update account (happy path)",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"BCA Utama (Renamed)\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/accounts/1",
-              "host": ["{{baseUrl}}"],
-              "path": ["accounts", "1"]
-            }
-          }
-        },
-        {
-          "name": "Delete account",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/accounts/7",
-              "host": ["{{baseUrl}}"],
-              "path": ["accounts", "7"]
-            },
-            "description": "Deletes the account created by \"Create account (happy path)\" (id 7 on a freshly-seeded database)."
+            "header": [{ "key": "Authorization", "value": "Bearer invalid-token" }],
+            "url": "{{baseUrl}}/accounts"
           }
         }
       ]
     },
     {
-      "name": "Categories",
+      "name": "2. Protected User Flow",
       "item": [
         {
-          "name": "List categories",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/categories",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories"]
+          "name": "Create my account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Account created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('accountId', pm.response.json().id);"
+                ]
+              }
             }
-          }
-        },
-        {
-          "name": "Get category by id",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/categories/1",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories", "1"]
-            }
-          }
-        },
-        {
-          "name": "Create category (happy path)",
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Education\",\n  \"type\": \"expense\"\n}"
+              "raw": "{\n  \"name\": \"Postman Wallet\",\n  \"type\": \"e-wallet\",\n  \"balance\": 250000\n}"
             },
-            "url": {
-              "raw": "{{baseUrl}}/categories",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories"]
-            }
-          },
-          "response": [
-            {
-              "name": "201 Created",
-              "originalRequest": {
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/categories",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["categories"]
-                }
-              },
-              "status": "Created",
-              "code": 201,
-              "_postman_previewlanguage": "json",
-              "header": [
-                { "key": "Content-Type", "value": "application/json" }
-              ],
-              "body": "{\n  \"id\": 8,\n  \"name\": \"Education\",\n  \"type\": \"expense\"\n}"
-            }
-          ]
-        },
-        {
-          "name": "Create category - validation error",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Bonus\",\n  \"type\": \"savings\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/categories",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories"]
-            },
-            "description": "`type` must be either income or expense. Expect 400 Bad Request."
-          },
-          "response": [
-            {
-              "name": "400 Bad Request",
-              "originalRequest": {
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/categories",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["categories"]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                { "key": "Content-Type", "value": "application/json" }
-              ],
-              "body": "{\n  \"message\": [\n    \"type must be one of the following values: income, expense\"\n  ],\n  \"error\": \"Bad Request\",\n  \"statusCode\": 400\n}"
-            }
-          ]
-        },
-        {
-          "name": "Update category (happy path)",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Salary & Bonus\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/categories/1",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories", "1"]
-            }
+            "url": "{{baseUrl}}/accounts"
           }
         },
         {
-          "name": "Delete category",
+          "name": "List my accounts",
           "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/categories/8",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories", "8"]
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/accounts"
+          }
+        },
+        {
+          "name": "Other user cannot read my account",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Hidden from other owner', () => pm.response.to.have.status(404));"] }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{secondToken}}" }],
+            "url": "{{baseUrl}}/accounts/{{accountId}}"
+          }
+        },
+        {
+          "name": "Client-supplied user_id is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Validation rejects forged owner', () => pm.response.to.have.status(400));"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 1,\n  \"name\": \"Forged Account\",\n  \"type\": \"bank\"\n}"
             },
-            "description": "Deletes the category created by \"Create category (happy path)\" (id 8 on a freshly-seeded database)."
+            "url": "{{baseUrl}}/accounts"
           }
         }
       ]
     },
     {
-      "name": "Transactions",
+      "name": "3. Admin RBAC",
       "item": [
         {
-          "name": "List transactions (nested account/category)",
+          "name": "Login seeded admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.collectionVariables.set('adminToken', pm.response.json().access_token);"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alya@example.com\",\n  \"password\": \"Fintrack123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Admin lists all accounts",
           "request": {
             "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/transactions",
-              "host": ["{{baseUrl}}"],
-              "path": ["transactions"]
-            },
-            "description": "Each transaction includes its `account`, `toAccount` (transfer destination, if any) and `category` nested in the same response (Prisma `include`)."
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/users/admin/all-accounts"
           }
         },
         {
-          "name": "Get transaction by id (nested account/category)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/transactions/1",
-              "host": ["{{baseUrl}}"],
-              "path": ["transactions", "1"]
-            }
-          }
-        },
-        {
-          "name": "Create transaction - income (happy path)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"account_id\": 1,\n  \"category_id\": 1,\n  \"type\": \"income\",\n  \"amount\": 9000000,\n  \"description\": \"August salary\",\n  \"transaction_date\": \"2026-08-01\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/transactions",
-              "host": ["{{baseUrl}}"],
-              "path": ["transactions"]
-            }
-          }
-        },
-        {
-          "name": "Create transaction - expense (happy path)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"account_id\": 1,\n  \"category_id\": 3,\n  \"type\": \"expense\",\n  \"amount\": 120000,\n  \"description\": \"Dinner\",\n  \"transaction_date\": \"2026-08-02\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/transactions",
-              "host": ["{{baseUrl}}"],
-              "path": ["transactions"]
-            }
-          }
-        },
-        {
-          "name": "Create transaction - transfer, same user (happy path)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"account_id\": 1,\n  \"to_account_id\": 2,\n  \"type\": \"transfer\",\n  \"amount\": 100000,\n  \"description\": \"Top up dompet harian\",\n  \"transaction_date\": \"2026-08-03\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/transactions",
-              "host": ["{{baseUrl}}"],
-              "path": ["transactions"]
-            },
-            "description": "Account 1 (BCA Utama) and account 2 (Dompet Harian) both belong to user 1, so this transfer is allowed and moves the balance between them."
-          }
-        },
-        {
-          "name": "Create transaction - transfer cross-user (validation error)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"account_id\": 1,\n  \"to_account_id\": 3,\n  \"type\": \"transfer\",\n  \"amount\": 100000,\n  \"transaction_date\": \"2026-08-03\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/transactions",
-              "host": ["{{baseUrl}}"],
-              "path": ["transactions"]
-            },
-            "description": "Account 1 belongs to user 1, account 3 belongs to user 2 — transfers are only allowed between accounts owned by the same user. Expect 400 Bad Request."
-          },
-          "response": [
+          "name": "Normal user cannot create category",
+          "event": [
             {
-              "name": "400 Bad Request",
-              "originalRequest": {
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/transactions",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["transactions"]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                { "key": "Content-Type", "value": "application/json" }
-              ],
-              "body": "{\n  \"message\": \"Transfers are only allowed between accounts owned by the same user\",\n  \"error\": \"Bad Request\",\n  \"statusCode\": 400\n}"
+              "listen": "test",
+              "script": { "exec": ["pm.test('Forbidden', () => pm.response.to.have.status(403));"] }
             }
-          ]
-        },
-        {
-          "name": "Create transaction - validation error",
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"account_id\": 1,\n  \"type\": \"withdrawal\",\n  \"transaction_date\": \"2026-08-03\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/transactions",
-              "host": ["{{baseUrl}}"],
-              "path": ["transactions"]
-            },
-            "description": "Missing required `category_id`/`amount`, and `type` is not one of income | expense | transfer. Expect 400 Bad Request."
-          },
-          "response": [
-            {
-              "name": "400 Bad Request",
-              "originalRequest": {
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/transactions",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["transactions"]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                { "key": "Content-Type", "value": "application/json" }
-              ],
-              "body": "{\n  \"message\": [\n    \"category_id must not be less than 1\",\n    \"category_id must be an integer number\",\n    \"type must be one of the following values: income, expense, transfer\",\n    \"amount must not be less than 0.01\",\n    \"amount must be a number conforming to the specified constraints\"\n  ],\n  \"error\": \"Bad Request\",\n  \"statusCode\": 400\n}"
-            }
-          ]
-        },
-        {
-          "name": "Update transaction (happy path)",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"description\": \"June salary (revised)\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/transactions/1",
-              "host": ["{{baseUrl}}"],
-              "path": ["transactions", "1"]
-            }
-          }
-        },
-        {
-          "name": "Delete transaction",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/transactions/25",
-              "host": ["{{baseUrl}}"],
-              "path": ["transactions", "25"]
-            },
-            "description": "Deletes the income transaction created by \"Create transaction - income (happy path)\" (id 25 on a freshly-seeded database). Deleting it automatically reverses its balance effect."
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Unauthorized Category\",\n  \"type\": \"expense\"\n}" },
+            "url": "{{baseUrl}}/categories"
           }
         }
       ]

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Account } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { isForeignKeyConstraintError } from '../prisma/prisma-error.util';
 import { UsersRepository } from './users.repository';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -45,7 +46,7 @@ export class UsersService {
     return this.usersRepository.create({
       name: dto.name,
       email: dto.email,
-      password: dto.password,
+      password: await bcrypt.hash(dto.password, 10),
       role: 'user',
     });
   }
@@ -58,7 +59,18 @@ export class UsersService {
         throw new ConflictException('Email already registered');
       }
     }
-    return this.usersRepository.update(id, dto);
+    return this.usersRepository.update(id, {
+      ...dto,
+      ...(dto.password && { password: await bcrypt.hash(dto.password, 10) }),
+    });
+  }
+
+  findByEmailForAuth(email: string) {
+    return this.usersRepository.findByEmail(email);
+  }
+
+  findAuthUserById(id: number) {
+    return this.usersRepository.findAuthUserById(id);
   }
 
   // Deleting the user cascades to their own accounts (onDelete: Cascade on

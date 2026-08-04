@@ -6,12 +6,15 @@ import { PrismaService } from '../prisma/prisma.service';
 export class AccountsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findUserById(id: number) {
-    return this.prisma.user.findUnique({ where: { id } });
-  }
-
   findAll() {
     return this.prisma.account.findMany({ orderBy: { id: 'asc' } });
+  }
+
+  findAllByUserId(userId: number) {
+    return this.prisma.account.findMany({
+      where: { user_id: userId },
+      orderBy: { id: 'asc' },
+    });
   }
 
   // Nested relational query: returns the account together with its own
@@ -19,6 +22,13 @@ export class AccountsRepository {
   findById(id: number) {
     return this.prisma.account.findUnique({
       where: { id },
+      include: { transactions: { orderBy: { transaction_date: 'desc' } } },
+    });
+  }
+
+  findByIdAndUserId(id: number, userId: number) {
+    return this.prisma.account.findFirst({
+      where: { id, user_id: userId },
       include: { transactions: { orderBy: { transaction_date: 'desc' } } },
     });
   }

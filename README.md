@@ -10,6 +10,33 @@ Source code project ada di folder [`fintrack-api/`](fintrack-api).
 
 Dokumentasi Swagger tersedia di [https://milestone-4-ai-novanx-production.up.railway.app/docs](https://milestone-4-ai-novanx-production.up.railway.app/docs).
 
+## What's New (Week 22 / Part 4)
+
+- Authentication memakai JWT Bearer (`@nestjs/jwt`, Passport JWT) melalui `POST /auth/register` dan `POST /auth/login`.
+- Password wajib minimal 8 karakter dengan huruf besar, kecil, dan angka; selalu di-hash dengan bcrypt sebelum disimpan dan tidak pernah dikirim dalam response API.
+- `accounts` dan `transactions` dilindungi `JwtAuthGuard`; query difilter berdasarkan user dari JWT, bukan `user_id` dari request body.
+- Categories dapat dibaca user terautentikasi, tetapi create/update/delete hanya untuk role `admin` melalui `RolesGuard` dan decorator `@Roles()`.
+- Profil user hanya dapat dibaca/diubah/dihapus oleh pemilik atau admin. Admin dapat melihat seluruh user dan akun lewat `GET /users/admin/all-accounts`.
+- Balance calculation diekstrak ke custom injectable provider agar business logic menggunakan dependency injection.
+- Security bootstrap mencakup Helmet, CORS allowlist dari environment, Swagger Bearer Auth, request logger middleware, dan limit 5 login per 60 detik.
+- E2E test mencakup register/login, bcrypt hash, 401 invalid/missing token, ownership isolation, forged owner payload, 403 RBAC, admin access, dan 429 throttling.
+
+### Demo credentials
+
+Setelah `npm run prisma:seed`, seluruh demo user memakai password `Fintrack123`. `alya@example.com` memiliki role `admin`; user lain, termasuk `bima@example.com`, memiliki role `user`.
+
+### Security configuration
+
+Isi variabel berikut di `.env` (jangan commit secret sebenarnya):
+
+```env
+JWT_SECRET=replace-with-a-long-random-secret
+JWT_EXPIRES_IN=3600
+CORS_ORIGINS=http://localhost:3000,https://your-frontend.example.com
+```
+
+Known limitations: token belum memiliki refresh/revocation flow, dan throttler memakai storage in-memory sehingga counter tidak dibagi antar instance deployment. Untuk deployment horizontal, gunakan shared throttler storage seperti Redis.
+
 ## What's New (Week 21)
 
 - Dokumentasi API interaktif dengan **Swagger/OpenAPI** (`@nestjs/swagger`), tersedia di `/docs`
@@ -49,6 +76,7 @@ Jalankan perintah berikut dari root repo:
 cd fintrack-api
 npm install
 cp .env.example .env
+# Ganti JWT_SECRET di .env dengan random secret yang kuat.
 npm run start:dev
 ```
 
@@ -62,59 +90,46 @@ Setelah server berjalan, dokumentasi API interaktif (Swagger UI) tersedia di:
 http://localhost:3000/docs
 ```
 
-Dokumentasi ini dihasilkan otomatis dari kode (`DocumentBuilder` + `SwaggerModule` di `fintrack-api/src/main.ts`) dan mencakup seluruh endpoint `users`, `accounts`, `categories`, dan `transactions`, lengkap dengan skema request/response, contoh nilai, dan status code (`200`, `201`, `204`, `400`, `404`) untuk tiap operasi.
+Dokumentasi ini dihasilkan otomatis dari kode (`DocumentBuilder` + `SwaggerModule` di `fintrack-api/src/main.ts`). Klik **Authorize** dan masukkan JWT dari endpoint login untuk mencoba protected endpoint.
 
 ## API Endpoints
 
 ### Users
 
-| Method | Endpoint | Deskripsi            |
-| ------ | -------- | -------------------- |
-| GET    | `/users` | Daftar semua user    |
-| POST   | `/users` | Registrasi user baru |
+| Method | Endpoint                    | Akses          | Deskripsi                   |
+| ------ | --------------------------- | -------------- | --------------------------- |
+| POST   | `/auth/register`            | Public         | Registrasi user baru        |
+| POST   | `/auth/login`               | Public         | Mendapatkan JWT             |
+| GET    | `/users/:id`                | Owner / admin  | Detail profil               |
+| PATCH  | `/users/:id`                | Owner / admin  | Update profil               |
+| DELETE | `/users/:id`                | Owner / admin  | Hapus profil                |
+| GET    | `/users`                    | Admin          | Daftar semua user           |
+| GET    | `/users/admin/all-accounts` | Admin          | Daftar seluruh akun         |
 
 ### Accounts
 
-| Method | Endpoint        | Deskripsi         |
-| ------ | --------------- | ----------------- |
-| GET    | `/accounts`     | Daftar semua akun |
-| GET    | `/accounts/:id` | Detail akun       |
-| POST   | `/accounts`     | Buat akun baru    |
-| PATCH  | `/accounts/:id` | Update akun       |
-| DELETE | `/accounts/:id` | Hapus akun        |
+Semua endpoint accounts membutuhkan Bearer token dan hanya mengakses akun milik user tersebut.
 
 ### Categories
 
-| Method | Endpoint          | Deskripsi             |
-| ------ | ----------------- | --------------------- |
-| GET    | `/categories`     | Daftar semua kategori |
-| GET    | `/categories/:id` | Detail kategori       |
-| POST   | `/categories`     | Buat kategori baru    |
-| PATCH  | `/categories/:id` | Update kategori       |
-| DELETE | `/categories/:id` | Hapus kategori        |
+Read membutuhkan Bearer token; create, update, dan delete membutuhkan role `admin`.
 
 ### Transactions
 
-| Method | Endpoint            | Deskripsi              |
-| ------ | ------------------- | ---------------------- |
-| GET    | `/transactions`     | Daftar semua transaksi |
-| GET    | `/transactions/:id` | Detail transaksi       |
-| POST   | `/transactions`     | Buat transaksi baru    |
-| PATCH  | `/transactions/:id` | Update transaksi       |
-| DELETE | `/transactions/:id` | Hapus transaksi        |
+Semua endpoint transactions membutuhkan Bearer token dan hanya mengakses transaksi dari akun milik user tersebut.
 
 ### Contoh Request Body
 
-**POST /users**
+**POST /auth/register**
 
 ```json
-{ "name": "Alya Putri", "email": "alya@example.com", "password": "secret123" }
+{ "name": "Alya Putri", "email": "alya@example.com", "password": "Secure123" }
 ```
 
 **POST /accounts**
 
 ```json
-{ "user_id": 1, "name": "BCA Utama", "type": "bank", "balance": 5000000 }
+{ "name": "BCA Utama", "type": "bank", "balance": 5000000 }
 ```
 
 **POST /categories**
@@ -152,7 +167,7 @@ Dokumentasi ini dihasilkan otomatis dari kode (`DocumentBuilder` + `SwaggerModul
 > `type` transactions: `income` | `expense` | `transfer`
 > `type` categories: `income` | `expense`
 > Untuk `type: "transfer"`, `category_id` tidak wajib diisi, tetapi `to_account_id` **wajib** diisi.
-> Transfer hanya diperbolehkan **antar akun milik user yang sama**; `to_account_id` harus berbeda dari `account_id` dan harus dimiliki oleh `user_id` yang sama dengan akun asal. Transfer ke akun milik user lain (atau tanpa `to_account_id`) ditolak dengan **400 Bad Request**.
+> Transfer hanya diperbolehkan **antar akun milik user dari JWT yang sama**; `to_account_id` harus berbeda dari `account_id`. Resource milik user lain disembunyikan dengan **404 Not Found**.
 
 ## Validasi
 
@@ -219,7 +234,7 @@ npm run test
 npm run test:e2e
 ```
 
-Tes e2e memeriksa bahwa endpoint dapat diakses dan mengembalikan field sesuai canonical schema FinTrack.
+Tes e2e membuat dan membersihkan data test sendiri serta memverifikasi authentication, password hashing, ownership, RBAC, validation, dan throttling.
 Hasil dan perintah smoke test deployment production didokumentasikan di
 [`fintrack-api/docs/api-smoke-test.md`](fintrack-api/docs/api-smoke-test.md).
 
@@ -227,6 +242,6 @@ Hasil dan perintah smoke test deployment production didokumentasikan di
 
 Collection Postman tersedia di [fintrack-api/docs/fintrack.postman_collection.json](https://github.com/Revou-FSSE-Feb26/milestone-4-AI-NovaNX/blob/main/fintrack-api/docs/fintrack.postman_collection.json) (klik untuk melihat isi file di GitHub, lalu download dan import ke Postman lewat `File → Import`). Atur variable `baseUrl` (default `http://localhost:3000`), lalu jalankan. Collection ini mencakup:
 
-- Request CRUD untuk `users`, `accounts`, `categories`, dan `transactions`
-- Contoh transfer antar akun sendiri (happy path) dan transfer lintas user (ditolak 400)
-- Minimal satu contoh **validation error (400)** per resource, lengkap dengan saved response example
+- Register → login → simpan token otomatis → protected account request
+- Invalid token (401), forged `user_id` (400), dan ownership isolation (404)
+- Login user kedua dan admin, admin global account access, serta user-to-admin negative flow (403)

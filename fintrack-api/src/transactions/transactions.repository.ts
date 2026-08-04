@@ -21,6 +21,14 @@ export class TransactionsRepository {
     });
   }
 
+  findAllByUserId(userId: number) {
+    return this.prisma.transaction.findMany({
+      where: { account: { user_id: userId } },
+      orderBy: { id: 'asc' },
+      include: relationsInclude,
+    });
+  }
+
   findById(id: number) {
     return this.prisma.transaction.findUnique({
       where: { id },
@@ -28,8 +36,19 @@ export class TransactionsRepository {
     });
   }
 
+  findByIdAndUserId(id: number, userId: number) {
+    return this.prisma.transaction.findFirst({
+      where: { id, account: { user_id: userId } },
+      include: relationsInclude,
+    });
+  }
+
   findAccountById(id: number) {
     return this.prisma.account.findUnique({ where: { id } });
+  }
+
+  findAccountByIdAndUserId(id: number, userId: number) {
+    return this.prisma.account.findFirst({ where: { id, user_id: userId } });
   }
 
   findCategoryById(id: number) {

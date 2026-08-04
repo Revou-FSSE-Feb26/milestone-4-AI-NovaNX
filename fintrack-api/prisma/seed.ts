@@ -2,10 +2,12 @@
 // Runs automatically after `prisma migrate dev` / `prisma migrate reset`,
 // and can be triggered manually with `npx prisma db seed`.
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const demoPasswordHash = await bcrypt.hash('Fintrack123', 10);
   // Reset tables and restart identity sequences, same as db/seed.sql.
   await prisma.$executeRawUnsafe(
     'TRUNCATE TABLE transactions, accounts, categories, users RESTART IDENTITY CASCADE',
@@ -16,35 +18,35 @@ async function main() {
       {
         name: 'Alya Putri',
         email: 'alya@example.com',
-        password: '$2b$10$mockhash.alya',
-        role: 'user',
+        password: demoPasswordHash,
+        role: 'admin',
         created_at: new Date('2026-05-01T08:00:00Z'),
       },
       {
         name: 'Bima Santoso',
         email: 'bima@example.com',
-        password: '$2b$10$mockhash.bima',
+        password: demoPasswordHash,
         role: 'user',
         created_at: new Date('2026-05-03T09:15:00Z'),
       },
       {
         name: 'Citra Lestari',
         email: 'citra@example.com',
-        password: '$2b$10$mockhash.citra',
+        password: demoPasswordHash,
         role: 'user',
         created_at: new Date('2026-05-08T10:30:00Z'),
       },
       {
         name: 'Danu Prasetyo',
         email: 'danu@example.com',
-        password: '$2b$10$mockhash.danu',
+        password: demoPasswordHash,
         role: 'user',
         created_at: new Date('2026-05-10T11:00:00Z'),
       },
       {
         name: 'Eka Rahmawati',
         email: 'eka@example.com',
-        password: '$2b$10$mockhash.eka',
+        password: demoPasswordHash,
         role: 'user',
         created_at: new Date('2026-05-12T13:45:00Z'),
       },

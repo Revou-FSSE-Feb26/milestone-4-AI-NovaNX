@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,12 +20,18 @@ import {
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiBadRequestResponse,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
+import type { AuthUser } from '../auth/auth-user.interface';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AccountsService } from './accounts.service';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
 
 @ApiTags('accounts')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('accounts')
 export class AccountsController {
   constructor(private readonly accountsService: AccountsService) {}
@@ -32,8 +39,8 @@ export class AccountsController {
   @Get()
   @ApiOperation({ summary: 'List all accounts' })
   @ApiOkResponse({ description: 'List of accounts returned successfully' })
-  findAll() {
-    return this.accountsService.findAll();
+  findAll(@CurrentUser() user: AuthUser) {
+    return this.accountsService.findAll(user.id);
   }
 
   @Get(':id')
@@ -41,8 +48,11 @@ export class AccountsController {
   @ApiParam({ name: 'id', type: Number, description: 'Account ID' })
   @ApiOkResponse({ description: 'Account returned successfully' })
   @ApiNotFoundResponse({ description: 'Account not found' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.accountsService.findOne(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.accountsService.findOne(id, user.id);
   }
 
   @Post()
@@ -50,8 +60,11 @@ export class AccountsController {
   @ApiCreatedResponse({ description: 'Account created successfully' })
   @ApiBadRequestResponse({ description: 'Validation failed' })
   @ApiNotFoundResponse({ description: 'User not found' })
-  create(@Body() createAccountDto: CreateAccountDto) {
-    return this.accountsService.create(createAccountDto);
+  create(
+    @CurrentUser() user: AuthUser,
+    @Body() createAccountDto: CreateAccountDto,
+  ) {
+    return this.accountsService.create(user.id, createAccountDto);
   }
 
   @Patch(':id')
@@ -62,9 +75,10 @@ export class AccountsController {
   @ApiBadRequestResponse({ description: 'Validation failed' })
   update(
     @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
     @Body() updateAccountDto: UpdateAccountDto,
   ) {
-    return this.accountsService.update(id, updateAccountDto);
+    return this.accountsService.update(id, user.id, updateAccountDto);
   }
 
   @Delete(':id')
@@ -73,7 +87,7 @@ export class AccountsController {
   @ApiParam({ name: 'id', type: Number, description: 'Account ID' })
   @ApiNoContentResponse({ description: 'Account deleted successfully' })
   @ApiNotFoundResponse({ description: 'Account not found' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.accountsService.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {
+    return this.accountsService.remove(id, user.id);
   }
 }

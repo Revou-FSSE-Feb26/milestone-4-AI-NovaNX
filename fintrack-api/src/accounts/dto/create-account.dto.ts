@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEnum,
-  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -16,14 +15,6 @@ export enum AccountType {
 }
 
 export class CreateAccountDto {
-  @ApiProperty({
-    description: 'ID of the user who owns this account',
-    example: 1,
-  })
-  @IsInt()
-  @Min(1)
-  user_id: number;
-
   @ApiProperty({ description: 'Account name', example: 'Main Bank Account' })
   @IsString()
   @IsNotEmpty()
