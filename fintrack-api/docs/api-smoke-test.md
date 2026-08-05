@@ -52,7 +52,13 @@ curl -X POST "$BASE_URL/auth/register" -H "Content-Type: application/json" -d '{
 Response — `201 Created` (password is excluded):
 
 ```json
-{"id":6,"name":"Nadia Putri","email":"nadia.smoke@example.com","role":"user","created_at":"2026-08-05T04:00:00.000Z"}
+{
+  "id": 6,
+  "name": "Nadia Putri",
+  "email": "nadia.smoke@example.com",
+  "role": "user",
+  "created_at": "2026-08-05T04:00:00.000Z"
+}
 ```
 
 #### `POST /auth/login`
@@ -66,7 +72,15 @@ curl -X POST "$BASE_URL/auth/login" -H "Content-Type: application/json" -d '{"em
 Response — `200 OK`:
 
 ```json
-{"access_token":"<signed-jwt>","user":{"id":2,"name":"Bima Santoso","email":"bima@example.com","role":"user"}}
+{
+  "access_token": "<signed-jwt>",
+  "user": {
+    "id": 2,
+    "name": "Bima Santoso",
+    "email": "bima@example.com",
+    "role": "user"
+  }
+}
 ```
 
 ### Users
@@ -82,7 +96,25 @@ curl "$BASE_URL/users" -H "Authorization: Bearer $ADMIN_TOKEN"
 Response — `200 OK` (array shortened; every user includes their accounts):
 
 ```json
-[{"id":1,"name":"Alya Putri","email":"alya@example.com","role":"admin","created_at":"2026-05-01T08:00:00.000Z","accounts":[{"id":1,"user_id":1,"name":"BCA Utama","type":"bank","balance":10250000,"created_at":"2026-05-01T08:30:00.000Z"}]}]
+[
+  {
+    "id": 1,
+    "name": "Alya Putri",
+    "email": "alya@example.com",
+    "role": "admin",
+    "created_at": "2026-05-01T08:00:00.000Z",
+    "accounts": [
+      {
+        "id": 1,
+        "user_id": 1,
+        "name": "BCA Utama",
+        "type": "bank",
+        "balance": 10250000,
+        "created_at": "2026-05-01T08:30:00.000Z"
+      }
+    ]
+  }
+]
 ```
 
 #### `GET /users/admin/all-accounts`
@@ -96,7 +128,16 @@ curl "$BASE_URL/users/admin/all-accounts" -H "Authorization: Bearer $ADMIN_TOKEN
 Response — `200 OK` (array shortened):
 
 ```json
-[{"id":1,"user_id":1,"name":"BCA Utama","type":"bank","balance":10250000,"created_at":"2026-05-01T08:30:00.000Z"}]
+[
+  {
+    "id": 1,
+    "user_id": 1,
+    "name": "BCA Utama",
+    "type": "bank",
+    "balance": 10250000,
+    "created_at": "2026-05-01T08:30:00.000Z"
+  }
+]
 ```
 
 #### `GET /users/:id`
@@ -110,7 +151,23 @@ curl "$BASE_URL/users/2" -H "Authorization: Bearer $USER_TOKEN"
 Response — `200 OK` (nested accounts shortened):
 
 ```json
-{"id":2,"name":"Bima Santoso","email":"bima@example.com","role":"user","created_at":"2026-05-03T09:15:00.000Z","accounts":[{"id":3,"user_id":2,"name":"Mandiri Payroll","type":"bank","balance":8350000,"created_at":"2026-05-03T09:30:00.000Z"}]}
+{
+  "id": 2,
+  "name": "Bima Santoso",
+  "email": "bima@example.com",
+  "role": "user",
+  "created_at": "2026-05-03T09:15:00.000Z",
+  "accounts": [
+    {
+      "id": 3,
+      "user_id": 2,
+      "name": "Mandiri Payroll",
+      "type": "bank",
+      "balance": 8350000,
+      "created_at": "2026-05-03T09:30:00.000Z"
+    }
+  ]
+}
 ```
 
 #### `POST /users`
@@ -124,7 +181,13 @@ curl -X POST "$BASE_URL/users" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Conte
 Response — `201 Created` (save the returned `id` as `<userId>`):
 
 ```json
-{"id":7,"name":"Raka Putra","email":"raka.smoke@example.com","role":"user","created_at":"2026-08-05T04:05:00.000Z"}
+{
+  "id": 7,
+  "name": "Raka Putra",
+  "email": "raka.smoke@example.com",
+  "role": "user",
+  "created_at": "2026-08-05T04:05:00.000Z"
+}
 ```
 
 #### `PATCH /users/:id`
@@ -138,7 +201,13 @@ curl -X PATCH "$BASE_URL/users/<userId>" -H "Authorization: Bearer $ADMIN_TOKEN"
 Response — `200 OK`:
 
 ```json
-{"id":7,"name":"Raka Pratama","email":"raka.smoke@example.com","role":"user","created_at":"2026-08-05T04:05:00.000Z"}
+{
+  "id": 7,
+  "name": "Raka Pratama",
+  "email": "raka.smoke@example.com",
+  "role": "user",
+  "created_at": "2026-08-05T04:05:00.000Z"
+}
 ```
 
 #### `DELETE /users/:id`
@@ -164,7 +233,24 @@ curl "$BASE_URL/accounts" -H "Authorization: Bearer $USER_TOKEN"
 Response — `200 OK`:
 
 ```json
-[{"id":3,"user_id":2,"name":"Mandiri Payroll","type":"bank","balance":8350000,"created_at":"2026-05-03T09:30:00.000Z"},{"id":4,"user_id":2,"name":"GoPay","type":"e-wallet","balance":460000,"created_at":"2026-05-03T09:35:00.000Z"}]
+[
+  {
+    "id": 3,
+    "user_id": 2,
+    "name": "Mandiri Payroll",
+    "type": "bank",
+    "balance": 8350000,
+    "created_at": "2026-05-03T09:30:00.000Z"
+  },
+  {
+    "id": 4,
+    "user_id": 2,
+    "name": "GoPay",
+    "type": "e-wallet",
+    "balance": 460000,
+    "created_at": "2026-05-03T09:35:00.000Z"
+  }
+]
 ```
 
 #### `GET /accounts/:id`
@@ -178,7 +264,27 @@ curl "$BASE_URL/accounts/3" -H "Authorization: Bearer $USER_TOKEN"
 Response — `200 OK` (nested transactions shortened):
 
 ```json
-{"id":3,"user_id":2,"name":"Mandiri Payroll","type":"bank","balance":8350000,"created_at":"2026-05-03T09:30:00.000Z","transactions":[{"id":15,"account_id":3,"to_account_id":null,"category_id":1,"type":"income","amount":8500000,"description":"July salary","transaction_date":"2026-07-01T00:00:00.000Z","created_at":"2026-07-01T08:05:00.000Z"}]}
+{
+  "id": 3,
+  "user_id": 2,
+  "name": "Mandiri Payroll",
+  "type": "bank",
+  "balance": 8350000,
+  "created_at": "2026-05-03T09:30:00.000Z",
+  "transactions": [
+    {
+      "id": 15,
+      "account_id": 3,
+      "to_account_id": null,
+      "category_id": 1,
+      "type": "income",
+      "amount": 8500000,
+      "description": "July salary",
+      "transaction_date": "2026-07-01T00:00:00.000Z",
+      "created_at": "2026-07-01T08:05:00.000Z"
+    }
+  ]
+}
 ```
 
 #### `POST /accounts`
@@ -192,7 +298,14 @@ curl -X POST "$BASE_URL/accounts" -H "Authorization: Bearer $USER_TOKEN" -H "Con
 Response — `201 Created` (save `id` as `<accountId>`):
 
 ```json
-{"id":11,"user_id":2,"name":"Smoke Test Cash","type":"cash","balance":100000,"created_at":"2026-08-05T04:10:00.000Z"}
+{
+  "id": 11,
+  "user_id": 2,
+  "name": "Smoke Test Cash",
+  "type": "cash",
+  "balance": 100000,
+  "created_at": "2026-08-05T04:10:00.000Z"
+}
 ```
 
 #### `PATCH /accounts/:id`
@@ -206,7 +319,14 @@ curl -X PATCH "$BASE_URL/accounts/<accountId>" -H "Authorization: Bearer $USER_T
 Response — `200 OK`:
 
 ```json
-{"id":11,"user_id":2,"name":"Smoke Test Wallet","type":"e-wallet","balance":100000,"created_at":"2026-08-05T04:10:00.000Z"}
+{
+  "id": 11,
+  "user_id": 2,
+  "name": "Smoke Test Wallet",
+  "type": "e-wallet",
+  "balance": 100000,
+  "created_at": "2026-08-05T04:10:00.000Z"
+}
 ```
 
 #### `DELETE /accounts/:id`
@@ -232,7 +352,10 @@ curl "$BASE_URL/categories" -H "Authorization: Bearer $USER_TOKEN"
 Response — `200 OK` (array shortened):
 
 ```json
-[{"id":1,"name":"Salary","type":"income"},{"id":3,"name":"Food & Dining","type":"expense"}]
+[
+  { "id": 1, "name": "Salary", "type": "income" },
+  { "id": 3, "name": "Food & Dining", "type": "expense" }
+]
 ```
 
 #### `GET /categories/:id`
@@ -246,7 +369,7 @@ curl "$BASE_URL/categories/3" -H "Authorization: Bearer $USER_TOKEN"
 Response — `200 OK`:
 
 ```json
-{"id":3,"name":"Food & Dining","type":"expense"}
+{ "id": 3, "name": "Food & Dining", "type": "expense" }
 ```
 
 #### `POST /categories`
@@ -260,7 +383,7 @@ curl -X POST "$BASE_URL/categories" -H "Authorization: Bearer $ADMIN_TOKEN" -H "
 Response — `201 Created` (save `id` as `<categoryId>`):
 
 ```json
-{"id":8,"name":"Smoke Test Expense","type":"expense"}
+{ "id": 8, "name": "Smoke Test Expense", "type": "expense" }
 ```
 
 #### `PATCH /categories/:id`
@@ -274,7 +397,7 @@ curl -X PATCH "$BASE_URL/categories/<categoryId>" -H "Authorization: Bearer $ADM
 Response — `200 OK`:
 
 ```json
-{"id":8,"name":"Smoke Test Shopping","type":"expense"}
+{ "id": 8, "name": "Smoke Test Shopping", "type": "expense" }
 ```
 
 #### `DELETE /categories/:id`
@@ -300,7 +423,22 @@ curl "$BASE_URL/transactions" -H "Authorization: Bearer $USER_TOKEN"
 Response — `200 OK` (array shortened; relations are included):
 
 ```json
-[{"id":9,"account_id":3,"to_account_id":null,"category_id":1,"type":"income","amount":8500000,"description":"June salary","transaction_date":"2026-06-01T00:00:00.000Z","created_at":"2026-06-01T08:05:00.000Z","account":{"id":3,"name":"Mandiri Payroll","type":"bank"},"toAccount":null,"category":{"id":1,"name":"Salary","type":"income"}}]
+[
+  {
+    "id": 9,
+    "account_id": 3,
+    "to_account_id": null,
+    "category_id": 1,
+    "type": "income",
+    "amount": 8500000,
+    "description": "June salary",
+    "transaction_date": "2026-06-01T00:00:00.000Z",
+    "created_at": "2026-06-01T08:05:00.000Z",
+    "account": { "id": 3, "name": "Mandiri Payroll", "type": "bank" },
+    "toAccount": null,
+    "category": { "id": 1, "name": "Salary", "type": "income" }
+  }
+]
 ```
 
 #### `GET /transactions/:id`
@@ -314,7 +452,20 @@ curl "$BASE_URL/transactions/9" -H "Authorization: Bearer $USER_TOKEN"
 Response — `200 OK`:
 
 ```json
-{"id":9,"account_id":3,"to_account_id":null,"category_id":1,"type":"income","amount":8500000,"description":"June salary","transaction_date":"2026-06-01T00:00:00.000Z","created_at":"2026-06-01T08:05:00.000Z","account":{"id":3,"name":"Mandiri Payroll","type":"bank"},"toAccount":null,"category":{"id":1,"name":"Salary","type":"income"}}
+{
+  "id": 9,
+  "account_id": 3,
+  "to_account_id": null,
+  "category_id": 1,
+  "type": "income",
+  "amount": 8500000,
+  "description": "June salary",
+  "transaction_date": "2026-06-01T00:00:00.000Z",
+  "created_at": "2026-06-01T08:05:00.000Z",
+  "account": { "id": 3, "name": "Mandiri Payroll", "type": "bank" },
+  "toAccount": null,
+  "category": { "id": 1, "name": "Salary", "type": "income" }
+}
 ```
 
 #### `POST /transactions`
@@ -328,7 +479,17 @@ curl -X POST "$BASE_URL/transactions" -H "Authorization: Bearer $USER_TOKEN" -H 
 Response — `201 Created` (save `id` as `<transactionId>`):
 
 ```json
-{"id":25,"account_id":3,"to_account_id":null,"category_id":3,"type":"expense","amount":50000,"description":"Smoke test lunch","transaction_date":"2026-08-05T00:00:00.000Z","created_at":"2026-08-05T04:15:00.000Z"}
+{
+  "id": 25,
+  "account_id": 3,
+  "to_account_id": null,
+  "category_id": 3,
+  "type": "expense",
+  "amount": 50000,
+  "description": "Smoke test lunch",
+  "transaction_date": "2026-08-05T00:00:00.000Z",
+  "created_at": "2026-08-05T04:15:00.000Z"
+}
 ```
 
 Transfer request variant (both accounts must belong to the JWT user):
@@ -340,7 +501,17 @@ curl -X POST "$BASE_URL/transactions" -H "Authorization: Bearer $USER_TOKEN" -H 
 Response — `201 Created`:
 
 ```json
-{"id":26,"account_id":3,"to_account_id":4,"category_id":null,"type":"transfer","amount":100000,"description":"Smoke test transfer","transaction_date":"2026-08-05T00:00:00.000Z","created_at":"2026-08-05T04:16:00.000Z"}
+{
+  "id": 26,
+  "account_id": 3,
+  "to_account_id": 4,
+  "category_id": null,
+  "type": "transfer",
+  "amount": 100000,
+  "description": "Smoke test transfer",
+  "transaction_date": "2026-08-05T00:00:00.000Z",
+  "created_at": "2026-08-05T04:16:00.000Z"
+}
 ```
 
 #### `PATCH /transactions/:id`
@@ -354,7 +525,17 @@ curl -X PATCH "$BASE_URL/transactions/<transactionId>" -H "Authorization: Bearer
 Response — `200 OK`:
 
 ```json
-{"id":25,"account_id":3,"to_account_id":null,"category_id":3,"type":"expense","amount":75000,"description":"Updated smoke test lunch","transaction_date":"2026-08-05T00:00:00.000Z","created_at":"2026-08-05T04:15:00.000Z"}
+{
+  "id": 25,
+  "account_id": 3,
+  "to_account_id": null,
+  "category_id": 3,
+  "type": "expense",
+  "amount": 75000,
+  "description": "Updated smoke test lunch",
+  "transaction_date": "2026-08-05T00:00:00.000Z",
+  "created_at": "2026-08-05T04:15:00.000Z"
+}
 ```
 
 The old balance effect is reversed and the new effect is applied in the same
@@ -435,3 +616,11 @@ The E2E suite uses the real Prisma-backed application. It covers authentication,
 password hashing, ownership, RBAC, 400/401/403/404/409/429 responses, category
 type integrity, same-owner transfer validation, and create/update/delete balance
 effects for income, expense, and transfer transactions.
+
+## Related Test Evidence
+
+The complete local API regression test report is available in the
+[Postman Newman Report](test-evidence/postman-report.html). This report
+complements the Railway production smoke test and covers authentication,
+authorization, CRUD operations, validation, balance updates, cleanup, and rate
+limiting.

@@ -244,9 +244,13 @@ Collection Postman tersedia di [fintrack-api/docs/fintrack.postman_collection.js
 
 - Registration, password policy, login, JWT, invalid credentials, invalid token, dan duplicate email
 - Profile owner/admin authorization serta CRUD accounts, categories, dan transactions
+- Validation-error case untuk setiap resource: auth, users, accounts, categories, dan transactions
 - Ownership isolation, category RBAC, forged identity, duplicate conflict, dan referential conflict
 - Income, expense, transfer, cross-user destination protection, update/reversal balance, dan relational response
 - Cleanup seluruh data dinamis yang dibuat saat run
 - Login throttling 429 sebagai folder terakhir
+
+Laporan hasil regression test Postman tersedia di
+[fintrack-api/docs/test-evidence/postman-report.html](fintrack-api/docs/test-evidence/postman-report.html). Laporan HTML ini dihasilkan dengan Newman dan merangkum hasil request, assertion, status pengujian, serta waktu respons API.
 
 Collection menggunakan nama dan email dinamis sehingga aman dijalankan ulang. Folder cleanup menghapus resource test, sedangkan demo user `alya@example.com` dan `bima@example.com` berasal dari seed dan tidak diubah permanen.

@@ -438,6 +438,32 @@
           }
         },
         {
+          "name": "Reject invalid user profile data",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Invalid user profile is rejected', () => pm.response.to.have.status(400));",
+                  "pm.test('Validation error explains the invalid name', () => pm.expect(pm.response.json().message).to.be.an('array').that.is.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Invalid User 123\"\n}"
+            },
+            "url": "{{baseUrl}}/users/{{registeredUserId}}"
+          }
+        },
+        {
           "name": "Cannot read another profile",
           "event": [
             {
@@ -624,6 +650,32 @@
           }
         },
         {
+          "name": "Reject invalid account data",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Invalid account data is rejected', () => pm.response.to.have.status(400));",
+                  "pm.test('Account validation errors are returned', () => pm.expect(pm.response.json().message).to.be.an('array').that.is.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Invalid Account {{runId}}\",\n  \"type\": \"crypto\",\n  \"balance\": -100\n}"
+            },
+            "url": "{{baseUrl}}/accounts"
+          }
+        },
+        {
           "name": "Create transfer destination account",
           "event": [
             {
@@ -773,6 +825,32 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Postman Expense {{runId}}\",\n  \"type\": \"expense\"\n}"
+            },
+            "url": "{{baseUrl}}/categories"
+          }
+        },
+        {
+          "name": "Reject invalid category data",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Invalid category data is rejected', () => pm.response.to.have.status(400));",
+                  "pm.test('Category validation errors are returned', () => pm.expect(pm.response.json().message).to.be.an('array').that.is.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Invalid Category {{runId}}\",\n  \"type\": \"transfer\"\n}"
             },
             "url": "{{baseUrl}}/categories"
           }
