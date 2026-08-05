@@ -623,4 +623,5 @@ The complete local API regression test report is available in the
 [Postman Newman Report](test-evidence/postman-report.html). This report
 complements the Railway production smoke test and covers authentication,
 authorization, CRUD operations, validation, balance updates, cleanup, and rate
-limiting.
+limiting. The latest Newman run completed 73 requests and 89 assertions with
+zero failures.

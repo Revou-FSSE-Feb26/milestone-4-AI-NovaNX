@@ -251,6 +251,6 @@ Collection Postman tersedia di [fintrack-api/docs/fintrack.postman_collection.js
 - Login throttling 429 sebagai folder terakhir
 
 Laporan hasil regression test Postman tersedia di
-[fintrack-api/docs/test-evidence/postman-report.html](fintrack-api/docs/test-evidence/postman-report.html). Laporan HTML ini dihasilkan dengan Newman dan merangkum hasil request, assertion, status pengujian, serta waktu respons API.
+[fintrack-api/docs/test-evidence/postman-report.html](fintrack-api/docs/test-evidence/postman-report.html). Run Newman terbaru menyelesaikan 73 request dan 89 assertion tanpa kegagalan. Laporan HTML tersebut merangkum hasil request, assertion, status pengujian, serta waktu respons API.
 
 Collection menggunakan nama dan email dinamis sehingga aman dijalankan ulang. Folder cleanup menghapus resource test, sedangkan demo user `alya@example.com` dan `bima@example.com` berasal dari seed dan tidak diubah permanen.
