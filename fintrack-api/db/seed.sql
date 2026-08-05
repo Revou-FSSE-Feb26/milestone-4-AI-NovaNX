@@ -81,6 +81,34 @@ VALUES (
         'e-wallet',
         695000.00,
         '2026-05-08 10:50:00'
+    ),
+    (
+        4,
+        'BRI Simpedes',
+        'bank',
+        4250000.00,
+        '2026-05-10 11:15:00'
+    ),
+    (
+        4,
+        'DANA',
+        'e-wallet',
+        350000.00,
+        '2026-05-10 11:20:00'
+    ),
+    (
+        5,
+        'BCA Tahapan',
+        'bank',
+        6750000.00,
+        '2026-05-12 14:00:00'
+    ),
+    (
+        5,
+        'ShopeePay',
+        'e-wallet',
+        525000.00,
+        '2026-05-12 14:05:00'
     );
 INSERT INTO categories (name, type)
 VALUES ('Salary', 'income'),

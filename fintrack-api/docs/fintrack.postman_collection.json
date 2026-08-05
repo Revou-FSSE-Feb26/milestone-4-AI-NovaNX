@@ -1,21 +1,51 @@
 {
   "info": {
-    "name": "FinTrack API - Auth & Security",
-    "description": "Part 4 flow: register, login, JWT-protected resources, ownership isolation, RBAC, invalid tokens, and validation.",
+    "name": "FinTrack API - Complete Regression",
+    "description": "Complete sequential regression flow for authentication, profile authorization, accounts, categories, transactions, balance effects, ownership, validation, conflicts, cleanup, and rate limiting. Run the collection in order against a freshly seeded environment.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "runId", "value": "" },
     { "key": "registerEmail", "value": "" },
+    { "key": "registeredUserId", "value": "" },
+    { "key": "adminCreatedUserId", "value": "" },
+    { "key": "secondUserId", "value": "" },
     { "key": "accessToken", "value": "" },
     { "key": "secondToken", "value": "" },
     { "key": "adminToken", "value": "" },
-    { "key": "accountId", "value": "1" }
+    { "key": "accountId", "value": "" },
+    { "key": "destinationAccountId", "value": "" },
+    { "key": "otherUserAccountId", "value": "" },
+    { "key": "incomeCategoryId", "value": "" },
+    { "key": "expenseCategoryId", "value": "" },
+    { "key": "incomeTransactionId", "value": "" },
+    { "key": "expenseTransactionId", "value": "" },
+    { "key": "transferTransactionId", "value": "" }
   ],
   "item": [
     {
       "name": "1. Authentication",
       "item": [
+        {
+          "name": "Public health endpoint",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Health endpoint is public', () => pm.response.to.have.status(200));",
+                  "pm.test('Health response is correct', () => pm.expect(pm.response.text()).to.eql('Hello World!'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/"
+          }
+        },
         {
           "name": "Register",
           "event": [
@@ -23,7 +53,9 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "pm.collectionVariables.set('registerEmail', `postman-${Date.now()}@example.com`);"
+                  "const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;",
+                  "pm.collectionVariables.set('runId', runId);",
+                  "pm.collectionVariables.set('registerEmail', `postman-${runId}@example.com`);"
                 ]
               }
             },
@@ -32,7 +64,8 @@
               "script": {
                 "exec": [
                   "pm.test('Registration succeeds', () => pm.response.to.have.status(201));",
-                  "pm.test('Password is hidden', () => pm.expect(pm.response.json()).not.to.have.property('password'));"
+                  "pm.test('Password is hidden', () => pm.expect(pm.response.json()).not.to.have.property('password'));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('registeredUserId', pm.response.json().id);"
                 ]
               }
             }
@@ -55,7 +88,8 @@
               "script": {
                 "exec": [
                   "pm.test('Login succeeds', () => pm.response.to.have.status(200));",
-                  "pm.collectionVariables.set('accessToken', pm.response.json().access_token);"
+                  "pm.test('JWT and user identity are returned', () => { const body = pm.response.json(); pm.expect(body.access_token).to.be.a('string').and.not.empty; pm.expect(body.access_token.split('.')).to.have.length(3); pm.expect(body.user.email).to.eql(pm.collectionVariables.get('registerEmail')); });",
+                  "if (pm.response.code === 200) pm.collectionVariables.set('accessToken', pm.response.json().access_token);"
                 ]
               }
             }
@@ -71,6 +105,72 @@
           }
         },
         {
+          "name": "Reject duplicate registration",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Duplicate email conflicts', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Duplicate Postman User\",\n  \"email\": \"{{registerEmail}}\",\n  \"password\": \"Secure123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "Reject weak registration password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Weak password is rejected', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Weak Password User\",\n  \"email\": \"weak-{{registerEmail}}\",\n  \"password\": \"weak\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "Reject invalid login credentials",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Invalid credentials are unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{registerEmail}}\",\n  \"password\": \"Wrong123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
           "name": "Login second seeded user",
           "event": [
             {
@@ -78,7 +178,7 @@
               "script": {
                 "exec": [
                   "pm.test('Second user login succeeds', () => pm.response.to.have.status(200));",
-                  "pm.collectionVariables.set('secondToken', pm.response.json().access_token);"
+                  "if (pm.response.code === 200) { const body = pm.response.json(); pm.collectionVariables.set('secondToken', body.access_token); pm.collectionVariables.set('secondUserId', body.user.id); }"
                 ]
               }
             }
@@ -126,7 +226,8 @@
               "script": {
                 "exec": [
                   "pm.test('Account created', () => pm.response.to.have.status(201));",
-                  "pm.collectionVariables.set('accountId', pm.response.json().id);"
+                  "pm.test('Owner and initial balance are correct', () => { const body = pm.response.json(); pm.expect(body.user_id).to.eql(Number(pm.collectionVariables.get('registeredUserId'))); pm.expect(body.balance).to.eql(250000); });",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('accountId', pm.response.json().id);"
                 ]
               }
             }
@@ -139,7 +240,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Postman Wallet\",\n  \"type\": \"e-wallet\",\n  \"balance\": 250000\n}"
+              "raw": "{\n  \"name\": \"Postman Wallet {{runId}}\",\n  \"type\": \"e-wallet\",\n  \"balance\": 250000\n}"
             },
             "url": "{{baseUrl}}/accounts"
           }
@@ -151,7 +252,8 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Protected account list succeeds', () => pm.response.to.have.status(200));"
+                  "pm.test('Protected account list succeeds', () => pm.response.to.have.status(200));",
+                  "pm.test('List contains only the created owner account', () => { const body = pm.response.json(); pm.expect(body).to.be.an('array'); pm.expect(body.some(a => a.id === Number(pm.collectionVariables.get('accountId')))).to.eql(true); pm.expect(body.every(a => a.user_id === Number(pm.collectionVariables.get('registeredUserId')))).to.eql(true); });"
                 ]
               }
             }
@@ -222,7 +324,7 @@
               "script": {
                 "exec": [
                   "pm.test('Admin login succeeds', () => pm.response.to.have.status(200));",
-                  "pm.collectionVariables.set('adminToken', pm.response.json().access_token);"
+                  "if (pm.response.code === 200) pm.collectionVariables.set('adminToken', pm.response.json().access_token);"
                 ]
               }
             }
@@ -280,6 +382,1150 @@
               "raw": "{\n  \"name\": \"Unauthorized Category\",\n  \"type\": \"expense\"\n}"
             },
             "url": "{{baseUrl}}/categories"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. User Profiles",
+      "item": [
+        {
+          "name": "Get my profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Owner can read profile', () => pm.response.to.have.status(200));",
+                  "pm.test('Password remains hidden', () => pm.expect(pm.response.json()).not.to.have.property('password'));",
+                  "pm.test('Profile ID matches JWT user', () => pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get('registeredUserId'))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/{{registeredUserId}}"
+          }
+        },
+        {
+          "name": "Update my profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Owner can update profile', () => pm.response.to.have.status(200));",
+                  "pm.test('Updated name is returned', () => pm.expect(pm.response.json().name).to.eql('Updated Postman User'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Postman User\"\n}"
+            },
+            "url": "{{baseUrl}}/users/{{registeredUserId}}"
+          }
+        },
+        {
+          "name": "Cannot read another profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Other profile is forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/{{secondUserId}}"
+          }
+        },
+        {
+          "name": "Normal user cannot list all users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('User list is admin-only', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users"
+          }
+        },
+        {
+          "name": "Admin lists all users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Admin can list users', () => pm.response.to.have.status(200));",
+                  "pm.test('Passwords are omitted', () => pm.expect(pm.response.json().every(u => !Object.prototype.hasOwnProperty.call(u, 'password'))).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/users"
+          }
+        },
+        {
+          "name": "Admin reads another profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Admin can read user profile', () => pm.response.to.have.status(200));",
+                  "pm.test('Requested user is returned', () => pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get('registeredUserId'))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/{{registeredUserId}}"
+          }
+        },
+        {
+          "name": "Admin creates a user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Admin user creation succeeds', () => pm.response.to.have.status(201));",
+                  "pm.test('Created role cannot be forged', () => pm.expect(pm.response.json().role).to.eql('user'));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('adminCreatedUserId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Admin Created User\",\n  \"email\": \"admin-created-{{runId}}@example.com\",\n  \"password\": \"Secure123\"\n}"
+            },
+            "url": "{{baseUrl}}/users"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Accounts CRUD & Ownership",
+      "item": [
+        {
+          "name": "Get my account detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Account detail succeeds', () => pm.response.to.have.status(200));",
+                  "pm.test('Nested transactions are present', () => pm.expect(pm.response.json().transactions).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/accounts/{{accountId}}"
+          }
+        },
+        {
+          "name": "Update my account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Account update succeeds', () => pm.response.to.have.status(200));",
+                  "pm.test('Account name is updated', () => pm.expect(pm.response.json().name).to.eql(`Primary Wallet ${pm.collectionVariables.get('runId')}`));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Primary Wallet {{runId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/accounts/{{accountId}}"
+          }
+        },
+        {
+          "name": "Duplicate account name returns 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Duplicate account conflicts', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Primary Wallet {{runId}}\",\n  \"type\": \"cash\"\n}"
+            },
+            "url": "{{baseUrl}}/accounts"
+          }
+        },
+        {
+          "name": "Create transfer destination account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Destination account created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('destinationAccountId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Transfer Target {{runId}}\",\n  \"type\": \"cash\"\n}"
+            },
+            "url": "{{baseUrl}}/accounts"
+          }
+        },
+        {
+          "name": "Create other user's account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Other user account created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('otherUserAccountId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{secondToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Other User Account {{runId}}\",\n  \"type\": \"cash\"\n}"
+            },
+            "url": "{{baseUrl}}/accounts"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Categories CRUD & RBAC",
+      "item": [
+        {
+          "name": "Authenticated user lists categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Authenticated category read succeeds', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/categories"
+          }
+        },
+        {
+          "name": "Admin creates income category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Income category created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('incomeCategoryId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Income {{runId}}\",\n  \"type\": \"income\"\n}"
+            },
+            "url": "{{baseUrl}}/categories"
+          }
+        },
+        {
+          "name": "Admin creates expense category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Expense category created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('expenseCategoryId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Expense {{runId}}\",\n  \"type\": \"expense\"\n}"
+            },
+            "url": "{{baseUrl}}/categories"
+          }
+        },
+        {
+          "name": "Duplicate category returns 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Duplicate category conflicts', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Expense {{runId}}\",\n  \"type\": \"expense\"\n}"
+            },
+            "url": "{{baseUrl}}/categories"
+          }
+        },
+        {
+          "name": "Get category detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Category detail succeeds', () => pm.response.to.have.status(200));",
+                  "pm.test('Correct category returned', () => pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get('expenseCategoryId'))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/categories/{{expenseCategoryId}}"
+          }
+        },
+        {
+          "name": "Admin updates category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Category update succeeds', () => pm.response.to.have.status(200));",
+                  "pm.test('Category name updated', () => pm.expect(pm.response.json().name).to.eql(`Updated Expense ${pm.collectionVariables.get('runId')}`));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Expense {{runId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/categories/{{expenseCategoryId}}"
+          }
+        },
+        {
+          "name": "Normal user cannot update category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Category update is admin-only', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Forbidden Update\"\n}"
+            },
+            "url": "{{baseUrl}}/categories/{{expenseCategoryId}}"
+          }
+        },
+        {
+          "name": "Normal user cannot delete category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Category deletion is admin-only', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/categories/{{expenseCategoryId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Transactions CRUD, Validation & Balances",
+      "item": [
+        {
+          "name": "Reject mismatched category type",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Mismatched category is rejected', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": {{accountId}},\n  \"category_id\": {{incomeCategoryId}},\n  \"type\": \"expense\",\n  \"amount\": 100,\n  \"transaction_date\": \"2026-08-05\"\n}"
+            },
+            "url": "{{baseUrl}}/transactions"
+          }
+        },
+        {
+          "name": "Reject income without category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Missing category is rejected', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": {{accountId}},\n  \"type\": \"income\",\n  \"amount\": 100,\n  \"transaction_date\": \"2026-08-05\"\n}"
+            },
+            "url": "{{baseUrl}}/transactions"
+          }
+        },
+        {
+          "name": "Create income transaction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Income created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('incomeTransactionId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": {{accountId}},\n  \"category_id\": {{incomeCategoryId}},\n  \"type\": \"income\",\n  \"amount\": 1000,\n  \"description\": \"Postman income\",\n  \"transaction_date\": \"2026-08-05\"\n}"
+            },
+            "url": "{{baseUrl}}/transactions"
+          }
+        },
+        {
+          "name": "Create expense transaction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Expense created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('expenseTransactionId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": {{accountId}},\n  \"category_id\": {{expenseCategoryId}},\n  \"type\": \"expense\",\n  \"amount\": 200,\n  \"description\": \"Postman expense\",\n  \"transaction_date\": \"2026-08-05\"\n}"
+            },
+            "url": "{{baseUrl}}/transactions"
+          }
+        },
+        {
+          "name": "Other user cannot read my transaction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Transaction ownership is enforced', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{secondToken}}" }
+            ],
+            "url": "{{baseUrl}}/transactions/{{incomeTransactionId}}"
+          }
+        },
+        {
+          "name": "Reject transfer without destination",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Missing destination is rejected', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": {{accountId}},\n  \"type\": \"transfer\",\n  \"amount\": 100,\n  \"transaction_date\": \"2026-08-05\"\n}"
+            },
+            "url": "{{baseUrl}}/transactions"
+          }
+        },
+        {
+          "name": "Reject transfer to same account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Same-account transfer is rejected', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": {{accountId}},\n  \"to_account_id\": {{accountId}},\n  \"type\": \"transfer\",\n  \"amount\": 100,\n  \"transaction_date\": \"2026-08-05\"\n}"
+            },
+            "url": "{{baseUrl}}/transactions"
+          }
+        },
+        {
+          "name": "Reject cross-user transfer destination",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Cross-user destination is hidden', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": {{accountId}},\n  \"to_account_id\": {{otherUserAccountId}},\n  \"type\": \"transfer\",\n  \"amount\": 100,\n  \"transaction_date\": \"2026-08-05\"\n}"
+            },
+            "url": "{{baseUrl}}/transactions"
+          }
+        },
+        {
+          "name": "Create transfer transaction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Transfer created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('transferTransactionId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": {{accountId}},\n  \"to_account_id\": {{destinationAccountId}},\n  \"type\": \"transfer\",\n  \"amount\": 500,\n  \"description\": \"Postman transfer\",\n  \"transaction_date\": \"2026-08-05\"\n}"
+            },
+            "url": "{{baseUrl}}/transactions"
+          }
+        },
+        {
+          "name": "List my transactions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Transaction list succeeds', () => pm.response.to.have.status(200));",
+                  "pm.test('Created transactions are present', () => { const ids = pm.response.json().map(t => t.id); pm.expect(ids).to.include(Number(pm.collectionVariables.get('incomeTransactionId'))); pm.expect(ids).to.include(Number(pm.collectionVariables.get('expenseTransactionId'))); pm.expect(ids).to.include(Number(pm.collectionVariables.get('transferTransactionId'))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/transactions"
+          }
+        },
+        {
+          "name": "Get transaction detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Transaction detail succeeds', () => pm.response.to.have.status(200));",
+                  "pm.test('Relations are nested', () => { const body = pm.response.json(); pm.expect(body.account).to.be.an('object'); pm.expect(body.category).to.be.an('object'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/transactions/{{expenseTransactionId}}"
+          }
+        },
+        {
+          "name": "Update expense amount",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Transaction update succeeds', () => pm.response.to.have.status(200));",
+                  "pm.test('Amount updated', () => pm.expect(pm.response.json().amount).to.eql(300));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 300\n}" },
+            "url": "{{baseUrl}}/transactions/{{expenseTransactionId}}"
+          }
+        },
+        {
+          "name": "Verify balances after update",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Source balance reflects income, expense, and transfer', () => pm.response.to.have.status(200));",
+                  "pm.test('Source balance is 250200', () => pm.expect(pm.response.json().balance).to.eql(250200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/accounts/{{accountId}}"
+          }
+        },
+        {
+          "name": "Verify destination balance",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Destination balance is 500', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().balance).to.eql(500); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/accounts/{{destinationAccountId}}"
+          }
+        },
+        {
+          "name": "Referenced destination account cannot be deleted",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Referenced destination returns conflict', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/accounts/{{destinationAccountId}}"
+          }
+        },
+        {
+          "name": "Referenced category cannot be deleted",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Referenced category returns conflict', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/categories/{{expenseCategoryId}}"
+          }
+        },
+        {
+          "name": "Delete income transaction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Income deletion succeeds', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/transactions/{{incomeTransactionId}}"
+          }
+        },
+        {
+          "name": "Delete expense transaction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Expense deletion succeeds', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/transactions/{{expenseTransactionId}}"
+          }
+        },
+        {
+          "name": "Delete transfer transaction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Transfer deletion succeeds', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/transactions/{{transferTransactionId}}"
+          }
+        },
+        {
+          "name": "Verify balances restored",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Source balance returns to initial value', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().balance).to.eql(250000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/accounts/{{accountId}}"
+          }
+        },
+        {
+          "name": "Verify destination balance restored",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Destination balance returns to zero', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().balance).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/accounts/{{destinationAccountId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Cleanup",
+      "item": [
+        {
+          "name": "Delete primary account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Primary account deleted', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/accounts/{{accountId}}"
+          }
+        },
+        {
+          "name": "Delete destination account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Destination account deleted', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/accounts/{{destinationAccountId}}"
+          }
+        },
+        {
+          "name": "Delete other user's test account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Other user account deleted', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{secondToken}}" }
+            ],
+            "url": "{{baseUrl}}/accounts/{{otherUserAccountId}}"
+          }
+        },
+        {
+          "name": "Delete income category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Income category deleted', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/categories/{{incomeCategoryId}}"
+          }
+        },
+        {
+          "name": "Delete expense category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Expense category deleted', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/categories/{{expenseCategoryId}}"
+          }
+        },
+        {
+          "name": "Delete registered user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Registered user deleted', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/{{registeredUserId}}"
+          }
+        },
+        {
+          "name": "Delete admin-created user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Admin-created user deleted', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/{{adminCreatedUserId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Rate Limiting (Run Last)",
+      "item": [
+        {
+          "name": "Repeated login eventually returns 429",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Repeated login is throttled', function (done) {",
+                  "  const codes = [pm.response.code];",
+                  "  let remaining = 6;",
+                  "  const sendAttempt = () => {",
+                  "    if (remaining === 0) { pm.expect(codes).to.include(429); done(); return; }",
+                  "    remaining -= 1;",
+                  "    pm.sendRequest({ url: `${pm.variables.get('baseUrl')}/auth/login`, method: 'POST', header: { 'Content-Type': 'application/json' }, body: { mode: 'raw', raw: JSON.stringify({ email: `missing-${pm.collectionVariables.get('runId')}@example.com`, password: 'Secure123' }) } }, (error, response) => {",
+                  "      pm.expect(error).to.not.exist;",
+                  "      codes.push(response.code);",
+                  "      sendAttempt();",
+                  "    });",
+                  "  };",
+                  "  sendAttempt();",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"missing-{{runId}}@example.com\",\n  \"password\": \"Secure123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
           }
         }
       ]

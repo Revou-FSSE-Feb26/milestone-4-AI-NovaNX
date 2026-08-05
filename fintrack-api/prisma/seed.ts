@@ -97,6 +97,34 @@ async function main() {
         balance: 695000.0,
         created_at: new Date('2026-05-08T10:50:00Z'),
       },
+      {
+        user_id: 4,
+        name: 'BRI Simpedes',
+        type: 'bank',
+        balance: 4250000.0,
+        created_at: new Date('2026-05-10T11:15:00Z'),
+      },
+      {
+        user_id: 4,
+        name: 'DANA',
+        type: 'e-wallet',
+        balance: 350000.0,
+        created_at: new Date('2026-05-10T11:20:00Z'),
+      },
+      {
+        user_id: 5,
+        name: 'BCA Tahapan',
+        type: 'bank',
+        balance: 6750000.0,
+        created_at: new Date('2026-05-12T14:00:00Z'),
+      },
+      {
+        user_id: 5,
+        name: 'ShopeePay',
+        type: 'e-wallet',
+        balance: 525000.0,
+        created_at: new Date('2026-05-12T14:05:00Z'),
+      },
     ],
   });
 
@@ -334,7 +362,7 @@ async function main() {
   });
 
   console.log(
-    'Seed completed: 5 users, 6 accounts, 7 categories, 24 transactions',
+    'Seed completed: 5 users, 10 accounts, 7 categories, 24 transactions',
   );
 }
 

@@ -17,7 +17,7 @@ Dokumentasi Swagger tersedia di [https://milestone-4-ai-novanx-production.up.rai
 - `accounts` dan `transactions` dilindungi `JwtAuthGuard`; query difilter berdasarkan user dari JWT, bukan `user_id` dari request body.
 - Categories dapat dibaca user terautentikasi, tetapi create/update/delete hanya untuk role `admin` melalui `RolesGuard` dan decorator `@Roles()`.
 - Profil user hanya dapat dibaca/diubah/dihapus oleh pemilik atau admin. Admin dapat melihat seluruh user dan akun lewat `GET /users/admin/all-accounts`.
-- Balance calculation diekstrak ke custom injectable provider agar business logic menggunakan dependency injection.
+- Balance calculation diekstrak ke custom injectable `BalanceUpdatesProvider` agar business logic menggunakan dependency injection. Provider ini berupa pure function yang tidak mengakses Prisma, database, maupun HTTP context, sehingga mudah di-unit-test secara terisolasi: class dapat di-instantiate langsung tanpa `TestingModule` atau mock dependency. Unit test khususnya tersedia di `src/transactions/providers/balance-updates.provider.spec.ts`.
 - Security bootstrap mencakup Helmet, CORS allowlist dari environment, Swagger Bearer Auth, request logger middleware, dan limit 5 login per 60 detik.
 - E2E test mencakup register/login, bcrypt hash, 401 invalid/missing token, ownership isolation, forged owner payload, 403 RBAC, admin access, dan 429 throttling.
 
@@ -53,7 +53,7 @@ Minggu lalu hanya tersedia 4 mock `GET` endpoint tanpa validasi. Minggu ini:
 - Balance-update logic di service layer: `income` menambah, `expense` mengurangi saldo akun; `PATCH` dan `DELETE` otomatis reverse efek lama
 - Enum `TransactionType` dipakai konsisten di DTO, interface, dan service
 - Schema `transactions.category_id` dibuat nullable dengan CHECK constraint untuk tipe `transfer`
-- Data seed dan mock service disinkronkan: 5 users, 6 accounts, 7 categories
+- Data seed disinkronkan: 5 users, masing-masing memiliki 2 accounts (10 accounts), 7 categories, dan 24 transactions
 - `tsconfig.json` dibersihkan dari opsi deprecated
 
 ## Entity-Relationship Diagram
@@ -196,7 +196,7 @@ Jika PostgreSQL meminta password role tertentu, sesuaikan `DATABASE_URL` di `.en
 DATABASE_URL=postgresql://<user>:<password>@localhost:5432/fintrack
 ```
 
-Data contoh (`fintrack-api/prisma/seed.ts`, 5 users, 6 accounts, 7 categories, 24 transactions — identik dengan `fintrack-api/db/seed.sql`) otomatis dijalankan setiap kali `prisma migrate dev` atau `prisma migrate reset` selesai, lewat konfigurasi `"prisma": { "seed": "..." }` di `package.json`. Untuk menjalankannya ulang secara manual (misalnya setelah data berubah saat testing):
+Data contoh (`fintrack-api/prisma/seed.ts`, 5 users, masing-masing memiliki 2 accounts sehingga total 10 accounts, 7 categories, dan 24 transactions — identik dengan `fintrack-api/db/seed.sql`) otomatis dijalankan setiap kali `prisma migrate dev` atau `prisma migrate reset` selesai, lewat konfigurasi `"prisma": { "seed": "..." }` di `package.json`. Untuk menjalankannya ulang secara manual (misalnya setelah data berubah saat testing):
 
 ```bash
 npx prisma db seed
@@ -240,8 +240,13 @@ Hasil dan perintah smoke test deployment production didokumentasikan di
 
 ## Postman Collection
 
-Collection Postman tersedia di [fintrack-api/docs/fintrack.postman_collection.json](https://github.com/Revou-FSSE-Feb26/milestone-4-AI-NovaNX/blob/main/fintrack-api/docs/fintrack.postman_collection.json) (klik untuk melihat isi file di GitHub, lalu download dan import ke Postman lewat `File → Import`). Atur variable `baseUrl` (default `http://localhost:3000`), lalu jalankan. Collection ini mencakup:
+Collection Postman tersedia di [fintrack-api/docs/fintrack.postman_collection.json](https://github.com/Revou-FSSE-Feb26/milestone-4-AI-NovaNX/blob/main/fintrack-api/docs/fintrack.postman_collection.json) (klik untuk melihat isi file di GitHub, lalu download dan import ke Postman lewat `File → Import`). Atur variable `baseUrl` (default `http://localhost:3000`), pastikan database telah menjalankan `npm run prisma:seed`, lalu jalankan seluruh collection secara berurutan. Collection regression ini mencakup:
 
-- Register → login → simpan token otomatis → protected account request
-- Invalid token (401), forged `user_id` (400), dan ownership isolation (404)
-- Login user kedua dan admin, admin global account access, serta user-to-admin negative flow (403)
+- Registration, password policy, login, JWT, invalid credentials, invalid token, dan duplicate email
+- Profile owner/admin authorization serta CRUD accounts, categories, dan transactions
+- Ownership isolation, category RBAC, forged identity, duplicate conflict, dan referential conflict
+- Income, expense, transfer, cross-user destination protection, update/reversal balance, dan relational response
+- Cleanup seluruh data dinamis yang dibuat saat run
+- Login throttling 429 sebagai folder terakhir
+
+Collection menggunakan nama dan email dinamis sehingga aman dijalankan ulang. Folder cleanup menghapus resource test, sedangkan demo user `alya@example.com` dan `bima@example.com` berasal dari seed dan tidak diubah permanen.
